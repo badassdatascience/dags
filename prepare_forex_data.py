@@ -38,11 +38,47 @@ def PrepareForexData():
         # run task and return the data produced
         #
         sql_query_for_candlestick_pull = get_candlestick_pull_query()
-        pdf = pull_candlesticks_into_pandas_dataframe(db_connection_str, sql_query_for_candlestick_pull)
+
+        pdf = pull_candlesticks_into_pandas_dataframe(db_connection_str, sql_query_for_candlestick_pull).sort_values(by = ['timestamp']) # move the sort procedure to the module
+
+        pdf.index = pdf['timestamp'] # move this to the module
+
         full_output_path = save_candlesticks_pandas_dataframe(pdf, pipeline_home)
+        
         to_return = {'initial_candlesticks_pdf' : pdf, 'initial_candlesticks_pdf_full_output_path' : full_output_path}
         return to_return
 
+    @task()
+    def generate_weekday_hour_offset_mapping(candlestick_data_dict: dict):
+
+        # TEMP, get this from somewhere else
+        table_prefix = 'candlestick_query_results'
+        table_prefix_new = 'weekday_hour_shifted'
+
+        import pytz
+        pdf = candlestick_data_dict['initial_candlesticks_pdf']
+        tz = pytz.timezone('US/Eastern')
+
+        pdf['datetime_tz'] = [datetime.datetime.fromtimestamp(x, tz) for x in pdf.index]
+        pdf['weekday_tz'] = [datetime.datetime.weekday(x) for x in pdf['datetime_tz']]
+        pdf['hour_tz'] = [x.hour for x in pdf['datetime_tz']]
+        
+        pdf_shifted_weekday_from_data = pdf[['weekday_tz', 'hour_tz']].drop_duplicates().sort_values(by = ['weekday_tz', 'hour_tz']).copy()
+
+        pdf_shifted_weekday_from_data['weekday_shifted'] = (
+            pdf_shifted_weekday_from_data['weekday_tz'].shift(-7)
+            .fillna(0.)
+            .astype('int32')
+        )
+
+        pdf_shifted_weekday_from_data['weekday_shifted'] = [4 if x == 6 else x for x in pdf_shifted_weekday_from_data['weekday_shifted']]
+
+        filename_and_path = candlestick_data_dict['initial_candlesticks_pdf_full_output_path'].replace(table_prefix, table_prefix_new)
+        pdf_shifted_weekday_manually_constructed.to_parquet(filename_and_path)
+
+        
+
+        
     #
     # we are not currently using this;
     # it is leftover from the tutorial I used
