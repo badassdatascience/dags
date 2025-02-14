@@ -37,7 +37,7 @@ def PrepareForexData():
         #
         # run task and return the data produced
         #
-        if True:
+        if True:  # False for debugging
             sql_query_for_candlestick_pull = get_candlestick_pull_query()
 
             pdf = pull_candlesticks_into_pandas_dataframe(db_connection_str, sql_query_for_candlestick_pull).sort_values(by = ['timestamp']) # move the sort procedure to the module
@@ -50,7 +50,8 @@ def PrepareForexData():
 
         else:
             import pandas as pd
-            test_file = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/candlestick_query_results_a3aa77b8-0bfe-4fa3-9216-c79db92876e4.parquet'
+            test_file = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/candlestick_query_results_1ffa7602-73a0-435a-8ba3-09eda3449707.parquet'
+
             pdf = pd.read_parquet(test_file)
 
             to_return = {'initial_candlesticks_pdf' : pdf, 'initial_candlesticks_pdf_full_output_path' : test_file}
@@ -58,43 +59,24 @@ def PrepareForexData():
         return to_return
 
     @task()
-    def generate_weekday_hour_offset_mapping(candlestick_data_dict : dict):
+    def generate_weekday_hour_offset_mapping(candlestick_data_dict: dict):
 
-        import pandas as pd
-        
-        # TEMP, get this from somewhere else
-        table_prefix = 'candlestick_query_results'
-        table_prefix_new = 'weekday_hour_shifted'
+        #
+        # TEMP until I figure out how to do this in airflow
+        #
+        pipeline_home = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components'
+        import sys;
+        sys.path.append(pipeline_home)
 
-        hour_list = []
-        weekday_list = []
-        shifted_list = []
+        #
+        # load the libraries we need
+        #
+        from offset import generate_offset_map
 
-        shifted_list.extend([0] * 17)
-
-        for i in range(0, 4):
-            weekday_list.extend([i] * 24)
-            hour_list.extend(sorted(list(range(0, 24))))
-
-            if i >= 1:
-                shifted_list.extend([i] * 24)
-
-        shifted_list.extend([4] * 24)
-
-        weekday_list.extend([4] * 17)
-        hour_list.extend(sorted(list(range(0, 17))))
-
-        weekday_list.extend([6] * 7)
-        hour_list.extend(sorted(list(range(17, 24))))
-        shifted_list.extend([0] * 7)
-
-        pdf_shifted_weekday_manually_constructed = pd.DataFrame({'weekday_tz' : weekday_list, 'hour_tz' : hour_list, 'weekday_shifted' : shifted_list})
-
-        filename_and_path = str(candlestick_data_dict['initial_candlesticks_pdf_full_output_path']).replace(table_prefix, table_prefix_new)
-        
-        pdf_shifted_weekday_manually_constructed.to_parquet(filename_and_path)
-
-        to_return = {'shifted_candlesticks_pdf' : pdf_shifted_weekday_manually_constructed, 'shifted_candlesticks_pdf_full_output_path' : filename_and_path}
+        #
+        # compute
+        #
+        to_return = generate_offset_map(candlestick_data_dict['initial_candlesticks_pdf_full_output_path'])
 
         return to_return
         
