@@ -56,6 +56,8 @@ def PrepareForexData():
         table_prefix_new = 'weekday_hour_shifted'
 
         import pytz
+        import datetime
+        
         pdf = candlestick_data_dict['initial_candlesticks_pdf']
         tz = pytz.timezone('US/Eastern')
 
@@ -74,7 +76,7 @@ def PrepareForexData():
         pdf_shifted_weekday_from_data['weekday_shifted'] = [4 if x == 6 else x for x in pdf_shifted_weekday_from_data['weekday_shifted']]
 
         filename_and_path = candlestick_data_dict['initial_candlesticks_pdf_full_output_path'].replace(table_prefix, table_prefix_new)
-        pdf_shifted_weekday_manually_constructed.to_parquet(filename_and_path)
+        pdf_shifted_weekday_from_data.to_parquet(filename_and_path)
 
         
 
