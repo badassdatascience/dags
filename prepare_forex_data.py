@@ -99,6 +99,7 @@ def PrepareForexData():
     # define pipeline component order and dependencies
     #
     candlestick_data_dict = extract_candlestick_data_from_database()
+    generate_weekday_hour_offset_mapping(candlestick_data_dict)
     temporary_placeholder = placeholder(candlestick_data_dict)
 
 #
