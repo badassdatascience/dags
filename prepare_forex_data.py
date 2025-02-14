@@ -37,7 +37,7 @@ def PrepareForexData():
         #
         # run task and return the data produced
         #
-        if False:
+        if True:
             sql_query_for_candlestick_pull = get_candlestick_pull_query()
 
             pdf = pull_candlesticks_into_pandas_dataframe(db_connection_str, sql_query_for_candlestick_pull).sort_values(by = ['timestamp']) # move the sort procedure to the module
