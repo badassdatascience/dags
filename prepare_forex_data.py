@@ -127,14 +127,36 @@ def PrepareForexData():
     # as a reference
     #
     @task(multiple_outputs = True)
-    def placeholder(candlestick_data_dict : dict, offset_map_dict : dict):
+    def merge_timezone_shift(
+            candlestick_data_timezone_dict : dict,
+            offset_map_dict : dict,
+            table_prefix = 'timezone_added', # get this somewhere else
+            table_prefix_new = 'merge_by_pandas',
+    ):
         """
-        This task is not defined yet; still trying to 
-        get airflow to work correctly before fixing this.
-        I.e., it is a placeholder just to ensure we have
-        a test pipeline containing a dependency.
+        Meh.
         """
-        return {'key' : 'words words words'}
+
+        import pandas as pd
+        pdf = (
+            pd.merge(
+                candlestick_data_timezone_dict['tz_added_candlesticks_pdf'],
+                offset_map_dict['shifted_candlesticks_pdf'],
+                on = ['weekday_tz', 'hour_tz'],
+                how = 'left'
+            )
+            .sort_values(by = ['datetime_tz'])
+        )
+
+        full_output_path = str(candlestick_data_timezone_dict['tz_added_candlesticks_pdf_full_output_path']).replace(table_prefix, table_prefix_new)
+
+        pdf.to_parquet(full_output_path)
+        
+        to_return = {'merged_candlesticks_pdf' : pdf, 'merged_candlesticks_pdf_full_output_path' : full_output_path}        
+
+        return to_return
+
+        
 
     #
     # define pipeline component order and dependencies
@@ -142,7 +164,7 @@ def PrepareForexData():
     candlestick_data_dict = extract_candlestick_data_from_database()
     candlestick_data_timezone_dict = add_timezone_information_to_original_pull(candlestick_data_dict)
     offset_map_dict = generate_weekday_hour_offset_mapping(candlestick_data_timezone_dict)
-    temporary_placeholder = placeholder(candlestick_data_timezone_dict, offset_map_dict)
+    merged_dict = merge_timezone_shift(candlestick_data_timezone_dict, offset_map_dict)
 
 #
 # declare a dag object
