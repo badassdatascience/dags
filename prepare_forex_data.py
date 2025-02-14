@@ -51,6 +51,8 @@ def PrepareForexData():
     @task()
     def generate_weekday_hour_offset_mapping():
 
+        import pandas as pd
+        
         # TEMP, get this from somewhere else
         table_prefix = 'candlestick_query_results'
         table_prefix_new = 'weekday_hour_shifted'
@@ -66,8 +68,8 @@ def PrepareForexData():
             weekday_list.extend([i] * 24)
             hour_list.extend(sorted(list(range(0, 24))))
 
-        if i >= 1:
-            shifted_list.extend([i] * 24)
+            if i >= 1:
+                shifted_list.extend([i] * 24)
 
         shifted_list.extend([4] * 24)
 
