@@ -2,7 +2,7 @@ import pendulum
 from airflow.decorators import dag, task
 
 # temp
-debug_mode = True
+debug_mode = False
 run_id = 'b69f9503-6ef9-4e37-8483-16679ed3b8fc'
 run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
 
