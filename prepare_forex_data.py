@@ -37,19 +37,28 @@ def PrepareForexData():
         #
         # run task and return the data produced
         #
-        sql_query_for_candlestick_pull = get_candlestick_pull_query()
+        if False:
+            sql_query_for_candlestick_pull = get_candlestick_pull_query()
 
-        pdf = pull_candlesticks_into_pandas_dataframe(db_connection_str, sql_query_for_candlestick_pull).sort_values(by = ['timestamp']) # move the sort procedure to the module
+            pdf = pull_candlesticks_into_pandas_dataframe(db_connection_str, sql_query_for_candlestick_pull).sort_values(by = ['timestamp']) # move the sort procedure to the module
 
-        pdf.index = pdf['timestamp'] # move this to the module
+            pdf.index = pdf['timestamp'] # move this to the module
 
-        full_output_path = save_candlesticks_pandas_dataframe(pdf, pipeline_home)
+            full_output_path = save_candlesticks_pandas_dataframe(pdf, pipeline_home)
         
-        to_return = {'initial_candlesticks_pdf' : pdf, 'initial_candlesticks_pdf_full_output_path' : full_output_path}
+            to_return = {'initial_candlesticks_pdf' : pdf, 'initial_candlesticks_pdf_full_output_path' : full_output_path}
+
+        else:
+            import pandas as pd
+            test_file = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/candlestick_query_results_a3aa77b8-0bfe-4fa3-9216-c79db92876e4.parquet'
+            pdf = pd.read_parquet(test_file)
+
+            to_return = {'initial_candlesticks_pdf' : pdf, 'initial_candlesticks_pdf_full_output_path' : test_file}
+
         return to_return
 
     @task()
-    def generate_weekday_hour_offset_mapping():
+    def generate_weekday_hour_offset_mapping(candlestick_data_dict : dict):
 
         import pandas as pd
         
@@ -57,7 +66,6 @@ def PrepareForexData():
         table_prefix = 'candlestick_query_results'
         table_prefix_new = 'weekday_hour_shifted'
 
-        #### manual
         hour_list = []
         weekday_list = []
         shifted_list = []
@@ -82,46 +90,13 @@ def PrepareForexData():
 
         pdf_shifted_weekday_manually_constructed = pd.DataFrame({'weekday_tz' : weekday_list, 'hour_tz' : hour_list, 'weekday_shifted' : shifted_list})
 
-        filename_and_path = candlestick_data_dict['initial_candlesticks_pdf_full_output_path'].replace(table_prefix, table_prefix_new)
+        filename_and_path = str(candlestick_data_dict['initial_candlesticks_pdf_full_output_path']).replace(table_prefix, table_prefix_new)
         
         pdf_shifted_weekday_manually_constructed.to_parquet(filename_and_path)
 
         to_return = {'shifted_candlesticks_pdf' : pdf_shifted_weekday_manually_constructed, 'shifted_candlesticks_pdf_full_output_path' : filename_and_path}
 
-        #######
-        
         return to_return
-
-
-
-
-    
-        
-        # import pytz
-        # import datetime
-        
-        # pdf = candlestick_data_dict['initial_candlesticks_pdf']
-        # tz = pytz.timezone('US/Eastern')
-
-        # pdf['datetime_tz'] = [datetime.datetime.fromtimestamp(x, tz) for x in pdf.index]
-        # pdf['weekday_tz'] = [datetime.datetime.weekday(x) for x in pdf['datetime_tz']]
-        # pdf['hour_tz'] = [x.hour for x in pdf['datetime_tz']]
-        
-        # pdf_shifted_weekday_from_data = pdf[['weekday_tz', 'hour_tz']].drop_duplicates().sort_values(by = ['weekday_tz', 'hour_tz']).copy()
-
-        # pdf_shifted_weekday_from_data['weekday_shifted'] = (
-        #     pdf_shifted_weekday_from_data['weekday_tz'].shift(-7)
-        #     .fillna(0.)
-        #     .astype('int32')
-        # )
-
-        # pdf_shifted_weekday_from_data['weekday_shifted'] = [4 if x == 6 else x for x in pdf_shifted_weekday_from_data['weekday_shifted']]
-
-        # filename_and_path = candlestick_data_dict['initial_candlesticks_pdf_full_output_path'].replace(table_prefix, table_prefix_new)
-        # pdf_shifted_weekday_from_data.to_parquet(filename_and_path)
-
-        
-
         
     #
     # we are not currently using this;
@@ -143,7 +118,7 @@ def PrepareForexData():
     # define pipeline component order and dependencies
     #
     candlestick_data_dict = extract_candlestick_data_from_database()
-    generate_weekday_hour_offset_mapping()
+    generate_weekday_hour_offset_mapping(candlestick_data_dict)
     temporary_placeholder = placeholder(candlestick_data_dict)
 
 #
