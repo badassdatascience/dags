@@ -2,8 +2,8 @@ import pendulum
 from airflow.decorators import dag, task
 
 # temp
-debug_mode = False
-run_id = 'b69f9503-6ef9-4e37-8483-16679ed3b8fc'
+debug_mode = True
+run_id = '1f09ecbb-2d83-46c6-9e9c-195792519cb6'
 run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
 
 @dag(
@@ -156,7 +156,61 @@ def PrepareForexData():
 
         return to_return
 
+
+
+    @task()
+    def shift_days_and_hours_as_needed(
+            merged_candlesticks_dict,
+            table_prefix = 'merge_by_pandas',
+            table_prefix_new = 'shifted',
+    ):
+
+        import datetime
+        import pandas as pd
+
+        df = merged_candlesticks_dict['merged_candlesticks_pdf']
+    
+        df['original_date'] = [x.date() for x in df['datetime_tz']]
+        df['to_shift'] = df['weekday_shifted'] - df['weekday_tz']
+
+        pdf_date_to_shift = (
+            df
+            .sort_values(by = 'datetime_tz')
+            [['weekday_tz', 'hour_tz', 'weekday_shifted', 'original_date', 'to_shift']]
+            .drop_duplicates()
+        )
+
+        new_date_list = []
+        for i, row in pdf_date_to_shift.iterrows():
+            if row['to_shift'] > 0:
+                delta = datetime.timedelta(days = row['to_shift'])
+                new_date_list.append(row['original_date'] + delta)
+            elif row['to_shift'] == -6:
+                delta = datetime.timedelta(days = 1)
+                new_date_list.append(row['original_date'] + delta)
+            else:
+                new_date_list.append(row['original_date'])
+
+        pdf_date_to_shift['original_date_shifted'] = new_date_list
+
+        pdf = (
+            pd.merge(
+                df.drop(columns = ['to_shift']),
+                pdf_date_to_shift,
+                on = ['weekday_tz', 'hour_tz', 'weekday_shifted', 'original_date'],
+                how = 'left',
+            )
+            .drop(columns = ['original_date', 'to_shift'])
+            .sort_values(by = ['datetime_tz'])
+        )
+
+        full_output_path = str(merged_candlesticks_dict['merged_candlesticks_pdf_full_output_path']).replace(table_prefix, table_prefix_new)
+
+        pdf.to_parquet(full_output_path)
         
+        to_return = {'shifted_candlesticks_pdf' : pdf, 'shifted_candlesticks_pdf_full_output_path' : full_output_path}        
+    
+        return to_return
 
     #
     # define pipeline component order and dependencies
@@ -165,6 +219,7 @@ def PrepareForexData():
     candlestick_data_timezone_dict = add_timezone_information_to_original_pull(candlestick_data_dict)
     offset_map_dict = generate_weekday_hour_offset_mapping(candlestick_data_timezone_dict)
     merged_dict = merge_timezone_shift(candlestick_data_timezone_dict, offset_map_dict)
+    shifted_dict = shift_days_and_hours_as_needed(merged_dict)
 
 #
 # declare a dag object
@@ -176,3 +231,6 @@ dag = PrepareForexData()
 #
 if __name__ == '__main__':
     dag.test()
+
+
+
