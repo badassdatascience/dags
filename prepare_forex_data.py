@@ -204,6 +204,9 @@ def PrepareForexData():
             .sort_values(by = ['datetime_tz'])
         )
 
+        # Should this be here or somewhere else?
+        pdf = pdf[~pdf['weekday_shifted'].isna()]
+
         full_output_path = str(merged_candlesticks_dict['merged_candlesticks_pdf_full_output_path']).replace(table_prefix, table_prefix_new)
 
         pdf.to_parquet(full_output_path)
@@ -212,6 +215,29 @@ def PrepareForexData():
     
         return to_return
 
+    @task()
+    def finalize_pandas_dataframe(
+            shifted_candlesticks_dict,
+            table_prefix = 'shifted',
+            table_prefix_new = 'pandas_preparation_completed',
+    ):
+        import numpy as np
+        
+        pdf = shifted_candlesticks_dict['shifted_candlesticks_pdf']
+        pdf['Return'] = pdf['c'] - pdf['o']
+        pdf['Volatility'] = pdf['h'] - pdf['l']
+        pdf['lhc_mean'] = pdf[['l', 'h', 'c']].mean(axis = 1, skipna = True)
+        
+        full_output_path = str(shifted_candlesticks_dict['shifted_candlesticks_pdf_full_output_path']).replace(table_prefix, table_prefix_new)        
+
+        pdf.to_parquet(full_output_path)
+        
+        to_return = {table_prefix_new + '_pdf' : pdf, table_prefix_new + '_full_output_path' : full_output_path}
+
+        return to_return
+
+
+    
     #
     # define pipeline component order and dependencies
     #
@@ -220,7 +246,8 @@ def PrepareForexData():
     offset_map_dict = generate_weekday_hour_offset_mapping(candlestick_data_timezone_dict)
     merged_dict = merge_timezone_shift(candlestick_data_timezone_dict, offset_map_dict)
     shifted_dict = shift_days_and_hours_as_needed(merged_dict)
-
+    final_pandas_dict = finalize_pandas_dataframe(shifted_dict)
+    
 #
 # declare a dag object
 #
