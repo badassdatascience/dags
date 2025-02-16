@@ -4,9 +4,9 @@ from airflow.decorators import dag, task
 
 
 # temp
-debug_mode = True
-run_id = '1f09ecbb-2d83-46c6-9e9c-195792519cb6'
-run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
+debug_mode = False
+#run_id = '1f09ecbb-2d83-46c6-9e9c-195792519cb6'
+#run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
 
 #
 # not sure this is the best place
@@ -267,13 +267,10 @@ def PrepareForexData():
         keep = ['original_date_shifted', 'timestamp', 'Return', 'Volatility', 'lhc_mean', 'volume']
         seconds_divisor = 60.
 
-
         
-        
-        pdf = final_pandas_dict['pandas_preparation_completed_pdf']
-
         full_output_path = str(final_pandas_dict['pandas_preparation_completed_full_output_path']).replace(table_prefix, table_prefix_new)        
-        
+
+
         #
         # move this to a config file
         #
@@ -299,71 +296,83 @@ def PrepareForexData():
             .getOrCreate()
         )
 
-        #
-        # define a UDF
-        #
-        udf_difference_an_array = f.udf(difference_an_array, ArrayType(IntegerType()))
-        
-        #
-        # convert Pandas dataframe to a Spark dataframe
-        #
-        sdf = (
-            spark.createDataFrame(pdf)
-            .select(keep)
-            .withColumnRenamed('original_date_shifted', 'date_post_shift')
-        )
 
-        #
-        # for debugging only
-        #
-        sdf = sdf.limit(5)
-        sdf.show(10)
-        
-        #
-        #
-        #
-        sdf_arrays = (
-            sdf
-            .orderBy('timestamp')
-            .groupBy('date_post_shift')
-            .agg(
-                f.collect_list('timestamp').alias('timestamp_array'),
-                f.collect_list('Return').alias('return_array'),
-                f.collect_list('Volatility').alias('volatility_array'),
-                f.collect_list('lhc_mean').alias('lhc_mean_array'),
-                f.collect_list('volume').alias('volume_array'),
+        if not debug_mode:
+
+            pdf = final_pandas_dict['pandas_preparation_completed_pdf']
+
+            #
+            # define a UDF
+            #
+            udf_difference_an_array = f.udf(difference_an_array, ArrayType(IntegerType()))
+
+            #
+            # convert Pandas dataframe to a Spark dataframe
+            #
+            sdf = (
+                spark.createDataFrame(pdf)
+                .select(keep)
+                .withColumnRenamed('original_date_shifted', 'date_post_shift')
             )
-            .withColumn('seconds_divisor', f.lit(seconds_divisor))
-            .withColumn('diff_timestamp', udf_difference_an_array(f.col('timestamp_array'), f.col('seconds_divisor')))
-            .drop('seconds_divisor')
-            .orderBy('date_post_shift')
-        )
 
-        # temp
-        sdf_arrays.show(5)
-                
-        sdf_arrays.write.mode('overwrite').parquet(full_output_path)
-                
+            #
+            # for debugging only
+            #
+            #sdf = sdf.limit(5)
+            sdf.show(3)
+
+            #
+            #
+            #
+            sdf_arrays = (
+                sdf
+                .orderBy('timestamp')
+                .groupBy('date_post_shift')
+                .agg(
+                    f.collect_list('timestamp').alias('timestamp_array'),
+                    f.collect_list('Return').alias('return_array'),
+                    f.collect_list('Volatility').alias('volatility_array'),
+                    f.collect_list('lhc_mean').alias('lhc_mean_array'),
+                    f.collect_list('volume').alias('volume_array'),
+                )
+                .withColumn('seconds_divisor', f.lit(seconds_divisor))
+                .withColumn('diff_timestamp', udf_difference_an_array(f.col('timestamp_array'), f.col('seconds_divisor')))
+                .drop('seconds_divisor')
+                .orderBy('date_post_shift')
+            )
+
+            # write to disk
+            sdf_arrays.write.mode('overwrite').parquet(full_output_path)
+
+        else:
+            sdf_arrays = spark.read.parquet(full_output_path)
+
+        sdf_arrays.show(3)
+        
         to_return = {'sdf_arrays_full_output_path' : full_output_path}
         return to_return
-
-        
-
     
     #
     # define pipeline component order and dependencies
     #
-    candlestick_data_dict = extract_candlestick_data_from_database()
-    candlestick_data_timezone_dict = add_timezone_information_to_original_pull(candlestick_data_dict)
-    offset_map_dict = generate_weekday_hour_offset_mapping(candlestick_data_timezone_dict)
-    merged_dict = merge_timezone_shift(candlestick_data_timezone_dict, offset_map_dict)
-    shifted_dict = shift_days_and_hours_as_needed(merged_dict)
-    final_pandas_dict = finalize_pandas_dataframe(shifted_dict)
-    moved_to_spark_dict = move_to_spark(final_pandas_dict)
+    if not debug_mode:
+        candlestick_data_dict = extract_candlestick_data_from_database()
+        candlestick_data_timezone_dict = add_timezone_information_to_original_pull(candlestick_data_dict)
+        offset_map_dict = generate_weekday_hour_offset_mapping(candlestick_data_timezone_dict)
+        merged_dict = merge_timezone_shift(candlestick_data_timezone_dict, offset_map_dict)
+        shifted_dict = shift_days_and_hours_as_needed(merged_dict)
+        final_pandas_dict = finalize_pandas_dataframe(shifted_dict)
+        moved_to_spark_dict = move_to_spark(final_pandas_dict)
+
+    else:
+        #
+        # debugging
+        #
+        moved_to_spark_dict = {'sdf_arrays_full_output_path': '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_1f09ecbb-2d83-46c6-9e9c-195792519cb6.parquet'}
+
+
 
         
-
-    
 #
 # declare a dag object
 #
