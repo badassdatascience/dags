@@ -235,8 +235,6 @@ def PrepareForexData():
         to_return = {table_prefix_new + '_pdf' : pdf, table_prefix_new + '_full_output_path' : full_output_path}
 
         return to_return
-
-
     
     #
     # define pipeline component order and dependencies
