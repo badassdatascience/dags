@@ -4,9 +4,9 @@ from airflow.decorators import dag, task
 
 
 # temp
-debug_mode = False
-#run_id = '1f09ecbb-2d83-46c6-9e9c-195792519cb6'
-#run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
+debug_mode = True
+run_id = '9754759d-2884-4612-8f32-35e6687b7a16'
+run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
 
 #
 # not sure this is the best place
@@ -368,7 +368,9 @@ def PrepareForexData():
         #
         # debugging
         #
-        moved_to_spark_dict = {'sdf_arrays_full_output_path': '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_1f09ecbb-2d83-46c6-9e9c-195792519cb6.parquet'}
+        moved_to_spark_dict = {
+            'sdf_arrays_full_output_path': run_dir + '/spark_' + run_id + '.parquet',
+        }
 
 
 
