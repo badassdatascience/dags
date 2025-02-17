@@ -348,16 +348,70 @@ def PrepareForexData():
             sdf_arrays = spark.read.parquet(full_output_path)
 
             # temp
-            sdf_arrays = sdf_arrays.limit(5)
+            #sdf_arrays = sdf_arrays.limit(5)
 
-            import utilities.deal_with_nans as dwn
-            sdf_arrays = dwn.deal_with_nans(sdf_arrays)
-
-            sdf_arrays.show(2)
-            
         
         to_return = {'sdf_arrays_full_output_path' : full_output_path}
         return to_return
+
+    @task()
+    def deal_with_nans():
+
+        from pyspark import SparkConf
+        from pyspark.sql import SparkSession
+        import pyspark.sql.functions as f
+        
+        #
+        # move this to a config file
+        #
+        spark_config = SparkConf().setAll(
+            [
+                ('spark.executor.memory', '15g'),
+                ('spark.executor.cores', '3'),
+                ('spark.cores.max', '3'),
+                ('spark.driver.memory', '15g'),
+                ('spark.sql.execution.arrow.pyspark.enabled', 'true'),
+            ]
+        )
+
+        #
+        # define spark session
+        #
+        spark = (
+            SparkSession
+            .builder
+            .master('local[*]')
+            .appName('forex_prep')
+            .config(conf = spark_config)
+            .getOrCreate()
+        )
+        
+        full_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_9754759d-2884-4612-8f32-35e6687b7a16.parquet'
+        sdf_arrays = spark.read.parquet(full_output_path)
+
+        sdf_arrays = sdf_arrays.limit(5)
+
+        import utilities.deal_with_nans as dwn
+        sdf_arrays = dwn.deal_with_nans(sdf_arrays)
+
+        sdf_arrays.show(2)
+
+        #
+        # test
+        #
+        # sdf_arrays = (
+        #     sdf_arrays
+        #     .withColumn('len_ts', f.array_size(f.col('timestamps_all')))
+        #     .withColumn('len_return', f.array_size(f.col('return_and_nans')))
+        #     .withColumn('len_volat', f.array_size(f.col('volatility_and_nans')))
+        #     .withColumn('len_volum', f.array_size(f.col('volume_and_nans')))
+        #     .withColumn('len_lhc', f.array_size(f.col('lhc_mean_and_nans')))
+        # )
+
+        # sdf_arrays.show(2)
+        
+        return {'words' : 'words'}
+        
     
     #
     # define pipeline component order and dependencies
@@ -375,6 +429,9 @@ def PrepareForexData():
         #
         # debugging
         #
+
+        print(deal_with_nans())
+
         
         moved_to_spark_dict = {
             'sdf_arrays_full_output_path': run_dir + '/spark_' + run_id + '.parquet',

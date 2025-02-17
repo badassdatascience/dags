@@ -18,6 +18,9 @@ udf_get_all_timestamps = f.udf(get_all_timestamps, ArrayType(IntegerType()))
 
 
 def locate_nans(timestamp_array, timestamp_all_array, values_array):
+
+    # make sure we get an argsort in here later to ensure order of values is correct
+
     ts = np.array(timestamp_array, dtype = np.uint64) # ??
     ts_all = np.array(timestamp_all_array, dtype = np.uint64)  # we can probably make this smaller
     v = np.array(values_array, dtype = np.float64)  # we can probably make this smaller
@@ -67,7 +70,7 @@ def deal_with_nans(sdf):
     for item in items_list:
         sdf = sdf.drop(item + '_array')
 
-    sdf = sdf.drop('timestamp_array')
+    sdf = sdf.drop('timestamp_array', 'diff_timestamp')
 
     return sdf
 
