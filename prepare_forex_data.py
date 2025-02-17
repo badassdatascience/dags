@@ -347,7 +347,14 @@ def PrepareForexData():
         else:
             sdf_arrays = spark.read.parquet(full_output_path)
 
-        sdf_arrays.show(3)
+            # temp
+            sdf_arrays = sdf_arrays.limit(5)
+
+            import utilities.deal_with_nans as dwn
+            sdf_arrays = dwn.deal_with_nans(sdf_arrays)
+
+            sdf_arrays.show(2)
+            
         
         to_return = {'sdf_arrays_full_output_path' : full_output_path}
         return to_return
@@ -368,10 +375,12 @@ def PrepareForexData():
         #
         # debugging
         #
+        
         moved_to_spark_dict = {
             'sdf_arrays_full_output_path': run_dir + '/spark_' + run_id + '.parquet',
         }
 
+    
 
 
         
