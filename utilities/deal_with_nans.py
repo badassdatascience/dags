@@ -9,6 +9,21 @@ from pyspark.sql.types import ArrayType, FloatType, IntegerType
 seconds_divisor = 60
 
 
+#https://stackoverflow.com/questions/41190852/most-efficient-way-to-forward-fill-nan-values-in-numpy-array
+def do_nans_exist(values_array):
+    values_array = np.array([np.array(values_array)])
+    mask = np.isnan(values_array)
+    has_nan_0_or_1 = np.max([int(x) for x in mask[0]])
+    return int(has_nan_0_or_1)
+
+def do_non_nans_exist(values_array):
+    values_array = np.array([np.array(values_array)])
+    mask = ~np.isnan(values_array)
+    has_nan_0_or_1 = np.max([int(x) for x in mask[0]])
+    return int(has_nan_0_or_1)
+
+udf_do_nans_exist = f.udf(do_nans_exist, IntegerType())
+udf_do_non_nans_exist = f.udf(do_nans_exist, IntegerType())
 
 def get_all_timestamps(timestamp_array, seconds_divisor):
     return [int(x) for x in range(min(timestamp_array), max(timestamp_array) + seconds_divisor, seconds_divisor)]
@@ -65,6 +80,19 @@ def deal_with_nans(sdf):
                 item + '_and_nans',
                 udf_locate_nans(f.col('timestamp_array'), f.col('timestamps_all'), f.col(item + '_array'))
             )
+
+            #
+            # useful for testing
+            #
+            # .withColumn(
+            #     item + '_nans_yes',
+            #     udf_do_nans_exist(f.col(item + '_and_nans'))
+            # )
+            # .withColumn(
+            #     item + '_non_nans_yes',
+            #     udf_do_non_nans_exist(f.col(item + '_and_nans'))
+            # )
+            
         )
 
     for item in items_list:
