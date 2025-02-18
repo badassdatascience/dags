@@ -396,6 +396,17 @@ def PrepareForexData():
                 
         sdf_arrays.show(2)
 
+        from utilities.sliding_window import udf_make_sliding_window
+
+        sdf_arrays = (
+            sdf_arrays
+            .withColumn(
+                'sw_return', udf_make_sliding_window(f.col('return_forward_filled'))
+            )
+        )
+
+        sdf_arrays.show(2)
+        
         #
         # test
         #
