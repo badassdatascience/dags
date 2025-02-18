@@ -393,7 +393,7 @@ def PrepareForexData():
 
         import utilities.deal_with_nans as dwn
         sdf_arrays = dwn.deal_with_nans(sdf_arrays)
-
+                
         sdf_arrays.show(2)
 
         #
@@ -407,7 +407,7 @@ def PrepareForexData():
         #     .withColumn('len_volum', f.array_size(f.col('volume_and_nans')))
         #     .withColumn('len_lhc', f.array_size(f.col('lhc_mean_and_nans')))
         # )
-
+        
         # sdf_arrays.show(2)
         
         return {'words' : 'words'}

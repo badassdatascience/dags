@@ -22,10 +22,10 @@ udf_do_nans_exist = f.udf(do_nans_exist, IntegerType())
 def do_non_nans_exist(values_array):
     values_array = np.array([np.array(values_array)])
     mask = ~np.isnan(values_array)
-    has_nan_0_or_1 = np.max([int(x) for x in mask[0]])
-    return int(has_nan_0_or_1)
-
-udf_do_non_nans_exist = f.udf(do_nans_exist, IntegerType())
+    has_non_nan_0_or_1 = np.max([int(x) for x in mask[0]])
+    return int(has_non_nan_0_or_1)
+    
+udf_do_non_nans_exist = f.udf(do_non_nans_exist, IntegerType())
 
 #https://stackoverflow.com/questions/41190852/most-efficient-way-to-forward-fill-nan-values-in-numpy-array
 def forward_fill(values_array):
@@ -110,17 +110,14 @@ def deal_with_nans(sdf):
             #     item + '_non_nans_yes',
             #     udf_do_non_nans_exist(f.col(item + '_and_nans'))
             # )
-            
-            .withColumn(
-                item + '_nans_yes',
-                udf_do_nans_exist(f.col(item + '_forward_filled'))
-            )
-            .withColumn(
-                item + '_non_nans_yes',
-                udf_do_non_nans_exist(f.col(item + '_forward_filled'))
-            )
-
-
+            # .withColumn(
+            #     item + '_nans_yes',
+            #     udf_do_nans_exist(f.col(item + '_forward_filled'))
+            # )
+            # .withColumn(
+            #     item + '_non_nans_yes',
+            #     udf_do_non_nans_exist(f.col(item + '_forward_filled'))
+            # )
         )
 
     for item in items_list:
