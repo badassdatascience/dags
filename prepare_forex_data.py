@@ -398,28 +398,28 @@ def PrepareForexData():
 
         from utilities.sliding_window import udf_make_sliding_window
 
-        sdf_arrays = (
-            sdf_arrays
-            .withColumn(
-                'sw_return', udf_make_sliding_window(f.col('return_forward_filled'))
+        item_list = ['return', 'volatility', 'volume', 'lhc_mean']
+
+        for item in item_list:
+            sdf_arrays = (
+                sdf_arrays
+                .withColumn('sw_' + item, udf_make_sliding_window(f.col(item + '_forward_filled')))
             )
-        )
+        for item in item_list:
+            sdf_arrays = sdf_arrays.drop(item + '_forward_filled')
 
         sdf_arrays.show(2)
         
         #
         # test
         #
-        # sdf_arrays = (
-        #     sdf_arrays
-        #     .withColumn('len_ts', f.array_size(f.col('timestamps_all')))
-        #     .withColumn('len_return', f.array_size(f.col('return_and_nans')))
-        #     .withColumn('len_volat', f.array_size(f.col('volatility_and_nans')))
-        #     .withColumn('len_volum', f.array_size(f.col('volume_and_nans')))
-        #     .withColumn('len_lhc', f.array_size(f.col('lhc_mean_and_nans')))
-        # )
+        for item in item_list:
+            sdf_arrays = (
+                sdf_arrays
+                .withColumn(item + '_len', f.array_size(f.col('sw_' + item)))
+        )
         
-        # sdf_arrays.show(2)
+        sdf_arrays.show(2)
         
         return {'words' : 'words'}
         
