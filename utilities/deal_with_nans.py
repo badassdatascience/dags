@@ -16,14 +16,28 @@ def do_nans_exist(values_array):
     has_nan_0_or_1 = np.max([int(x) for x in mask[0]])
     return int(has_nan_0_or_1)
 
+udf_do_nans_exist = f.udf(do_nans_exist, IntegerType())
+
+#https://stackoverflow.com/questions/41190852/most-efficient-way-to-forward-fill-nan-values-in-numpy-array
 def do_non_nans_exist(values_array):
     values_array = np.array([np.array(values_array)])
     mask = ~np.isnan(values_array)
     has_nan_0_or_1 = np.max([int(x) for x in mask[0]])
     return int(has_nan_0_or_1)
 
-udf_do_nans_exist = f.udf(do_nans_exist, IntegerType())
 udf_do_non_nans_exist = f.udf(do_nans_exist, IntegerType())
+
+#https://stackoverflow.com/questions/41190852/most-efficient-way-to-forward-fill-nan-values-in-numpy-array
+def forward_fill(values_array):
+    arr = np.array([values_array])
+    mask = np.isnan(arr)
+    idx = np.where(~mask, np.arange(mask.shape[1]), 0)
+    np.maximum.accumulate(idx, axis = 1, out = idx)
+    arr[mask] = arr[np.nonzero(mask)[0], idx[mask]]
+    to_return = list([float(x) for x in arr[0]])
+    return to_return
+
+udf_forward_fill = f.udf(forward_fill, ArrayType(FloatType()))
 
 def get_all_timestamps(timestamp_array, seconds_divisor):
     return [int(x) for x in range(min(timestamp_array), max(timestamp_array) + seconds_divisor, seconds_divisor)]
@@ -80,10 +94,14 @@ def deal_with_nans(sdf):
                 item + '_and_nans',
                 udf_locate_nans(f.col('timestamp_array'), f.col('timestamps_all'), f.col(item + '_array'))
             )
+            .withColumn(
+                item + '_forward_filled',
+                udf_forward_fill(f.col(item + '_and_nans'))
+            )
 
-            #
-            # useful for testing
-            #
+            # #
+            # # useful for testing
+            # #
             # .withColumn(
             #     item + '_nans_yes',
             #     udf_do_nans_exist(f.col(item + '_and_nans'))
@@ -93,10 +111,20 @@ def deal_with_nans(sdf):
             #     udf_do_non_nans_exist(f.col(item + '_and_nans'))
             # )
             
+            .withColumn(
+                item + '_nans_yes',
+                udf_do_nans_exist(f.col(item + '_forward_filled'))
+            )
+            .withColumn(
+                item + '_non_nans_yes',
+                udf_do_non_nans_exist(f.col(item + '_forward_filled'))
+            )
+
+
         )
 
     for item in items_list:
-        sdf = sdf.drop(item + '_array')
+        sdf = sdf.drop(item + '_array', item + '_and_nans')
 
     sdf = sdf.drop('timestamp_array', 'diff_timestamp')
 
