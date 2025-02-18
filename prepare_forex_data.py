@@ -389,16 +389,35 @@ def PrepareForexData():
         full_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_9754759d-2884-4612-8f32-35e6687b7a16.parquet'
         sdf_arrays = spark.read.parquet(full_output_path)
 
-        sdf_arrays = sdf_arrays.limit(5)
+        # for debugging:
+        #sdf_arrays = sdf_arrays.limit(5)
 
         import utilities.deal_with_nans as dwn
         sdf_arrays = dwn.deal_with_nans(sdf_arrays)
                 
         sdf_arrays.show(2)
 
+        #
+        # trig functions
+        #
+        from utilities.trig import udf_sin_24_hours, udf_cos_24_hours
+        sdf_arrays = (
+            sdf_arrays
+            .withColumn('sin_forward_filled', udf_sin_24_hours(f.col('timestamps_all')))
+            .withColumn('cos_forward_filled', udf_cos_24_hours(f.col('timestamps_all')))
+        )
+        sdf_arrays.show(2)
+
+        #
+        # sliding window
+        #
+        print()
+        print('Sliding Window')
+        print()
+        
         from utilities.sliding_window import udf_make_sliding_window
 
-        item_list = ['return', 'volatility', 'volume', 'lhc_mean']
+        item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
 
         for item in item_list:
             sdf_arrays = (
@@ -409,18 +428,46 @@ def PrepareForexData():
             sdf_arrays = sdf_arrays.drop(item + '_forward_filled')
 
         sdf_arrays.show(2)
-        
+
         #
-        # test
+        # prepare to explode arrays
         #
-        for item in item_list:
-            sdf_arrays = (
-                sdf_arrays
-                .withColumn(item + '_len', f.array_size(f.col('sw_' + item)))
+        # sdf_arrays = sdf_arrays.drop('timestamps_all')
+       
+        # #
+        # # test
+        # #
+        # for item in item_list:
+        #     sdf_arrays = (
+        #         sdf_arrays
+        #         .withColumn(item + '_len', f.array_size(f.col('sw_' + item)))
+        # )
+
+        #
+        # explode arrays
+        #
+        sdf_arrays = (
+            sdf_arrays
+            .withColumn('zipped_array', f.arrays_zip('timestamps_all', 'sw_return', 'sw_volatility', 'sw_volume', 'sw_lhc_mean', 'sw_sin', 'sw_cos'))
+            .withColumn('zipped_array', f.explode('zipped_array'))
+            .select(
+                'date_post_shift',
+                f.col('zipped_array.timestamps_all').alias('timestamp'),
+                f.col('zipped_array.sw_return').alias('return'),
+                f.col('zipped_array.sw_volatility').alias('volatility'),
+                f.col('zipped_array.sw_volume').alias('volume'),
+                f.col('zipped_array.sw_lhc_mean').alias('lhc_mean'),
+                f.col('zipped_array.sw_sin').alias('sin'),
+                f.col('zipped_array.sw_cos').alias('cos'),
+            )
         )
         
+
+        full_exploded_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_exploded_9754759d-2884-4612-8f32-35e6687b7a16.parquet'
+
+        sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
+            
         sdf_arrays.show(2)
-        
         return {'words' : 'words'}
         
     
