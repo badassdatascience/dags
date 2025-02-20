@@ -347,6 +347,9 @@ def PrepareForexData():
         else:
             sdf_arrays = spark.read.parquet(full_output_path)
 
+            
+
+            
             # temp
             #sdf_arrays = sdf_arrays.limit(5)
 
@@ -357,9 +360,12 @@ def PrepareForexData():
     @task()
     def deal_with_nans():
 
+        import numpy as np
+        
         from pyspark import SparkConf
         from pyspark.sql import SparkSession
         import pyspark.sql.functions as f
+        from pyspark.sql.types import BooleanType, IntegerType, ArrayType, FloatType
         
         #
         # move this to a config file
@@ -389,17 +395,32 @@ def PrepareForexData():
         full_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_9754759d-2884-4612-8f32-35e6687b7a16.parquet'
         sdf_arrays = spark.read.parquet(full_output_path)
 
-        # for debugging:
-        #sdf_arrays = sdf_arrays.limit(5)
 
+        
+
+        
+        #####################
+        #   For debugging   #
+        #####################
+        
+        # sdf_arrays = sdf_arrays.limit(5)
+
+        ######################
+        #   Deal with NaNs   #
+        ######################
+        
         import utilities.deal_with_nans as dwn
         sdf_arrays = dwn.deal_with_nans(sdf_arrays)
                 
         sdf_arrays.show(2)
 
-        #
-        # trig functions
-        #
+
+        
+        
+        ##########################
+        #   Add trig functions   #
+        ##########################
+        
         from utilities.trig import udf_sin_24_hours, udf_cos_24_hours
         sdf_arrays = (
             sdf_arrays
@@ -408,9 +429,146 @@ def PrepareForexData():
         )
         sdf_arrays.show(2)
 
+        ###############################
+        #   Ensure order is correct   #
+        ###############################
+
+        print()
+        print('ORDER')
+        print()
+
+        def calculate_order(timestamp_list):
+            import numpy as np # ?
+            tl = np.array(timestamp_list)
+            to_return = [int(x) for x in np.argsort(tl)]
+            return to_return
+
+        udf_calculate_order = f.udf(calculate_order, ArrayType(IntegerType()))
+
+        # [[1.3312267, 1.33...
+        # [[1.32732, 1.3273..
         #
-        # sliding window
-        #
+        def ensure_sort_float(timestamp_sort_list, values_list):
+            import numpy as np
+            ts = np.array(timestamp_sort_list)
+            v = np.array(values_list)
+            to_return = [float(x) for x in v[ts]]
+            return to_return
+
+        udf_ensure_sort_float = f.udf(ensure_sort_float, ArrayType(FloatType()))
+
+        def ensure_sort_int(timestamp_sort_list, values_list):
+            import numpy as np
+            ts = np.array(timestamp_sort_list)
+            v = np.array(values_list)
+            to_return = [int(x) for x in v[ts]]
+            return to_return
+
+        udf_ensure_sort_int = f.udf(ensure_sort_int, ArrayType(IntegerType()))
+
+
+
+        
+        sdf_arrays = sdf_arrays.withColumn('timestamps_sorted', udf_calculate_order(f.col('timestamps_all')))
+
+        item_list = ['timestamps_all', 'return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
+        for item in item_list:
+            if item == 'timestamps_all':
+                sdf_arrays = sdf_arrays.withColumn(item + '_sorted', udf_ensure_sort_int(f.col('timestamps_sorted'), f.col(item)))
+            else:
+                sdf_arrays = sdf_arrays.withColumn(item + '_sorted', udf_ensure_sort_float(f.col('timestamps_sorted'), f.col(item + '_forward_filled')))
+
+                
+        item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
+        for item in item_list:
+            sdf_arrays = sdf_arrays.drop(item + '_forward_filled')
+
+        sdf_arrays = (
+            sdf_arrays
+            .drop('timestamps_sorted', 'timestamps_all')
+        )
+        
+
+            
+        sdf_arrays.show(2)
+
+        print()
+        print('ORDER CLOSED')
+        print()
+                                                   
+
+        
+        ################################
+        #   QA before sliding window   #
+        ################################
+        
+        item_ff_list = ['timestamps_all_sorted', 'return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
+        for item in item_ff_list:
+            if item == 'timestamps_all_sorted':
+                sdf_arrays = sdf_arrays.withColumn('timestamps_all_sorted_length', f.array_size(f.col('timestamps_all_sorted')))
+            else:
+                sdf_arrays = sdf_arrays.withColumn(item + '_length', f.array_size(f.col(item + '_sorted')))
+                
+        def array_length_test(timestamps_array, return_array, volatility_array, volume_array, lhc_mean_array, sin_array, cos_array):
+            length_mean = np.mean(
+                (
+                    len(timestamps_array),
+                    len(return_array),
+                    len(volatility_array),
+                    len(volume_array),
+                    len(lhc_mean_array),
+                    len(sin_array),
+                    len(cos_array),
+                )
+            )
+            return int(length_mean) == len(timestamps_array)
+
+        udf_array_length_test = f.udf(array_length_test, BooleanType())
+
+        sdf_arrays = (
+            sdf_arrays
+            .withColumn(
+                'array_length_mean_test',
+                udf_array_length_test(
+                    f.col('timestamps_all_sorted'),
+                    f.col('return_sorted'),
+                    f.col('volatility_sorted'),
+                    f.col('volume_sorted'),
+                    f.col('lhc_mean_sorted'),
+                    f.col('sin_sorted'),
+                    f.col('cos_sorted'),
+                )
+            )
+            .where(f.col('array_length_mean_test') == True)
+        )
+
+        item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
+        for item in item_list:
+            sdf_arrays = sdf_arrays.drop(item + '_length')
+
+        sdf_arrays = sdf_arrays.drop('array_length_mean_test')
+                        
+        sdf_arrays.show(2)
+
+        ###############################################
+        #   Find lists too short for sliding window   #
+        ###############################################
+
+        # I don't know why there is only one row that is two short
+        
+        # temp
+        n_back = 180
+        n_forward = 30
+        offset = 1
+        
+        sdf_arrays = sdf_arrays.where(f.col('timestamps_all_sorted_length') >= (n_back + n_forward + offset))
+        
+        sdf_arrays.show(2)
+        
+        ######################
+        #   Sliding window   #
+        ######################
+        
         print()
         print('Sliding Window')
         print()
@@ -422,52 +580,53 @@ def PrepareForexData():
         for item in item_list:
             sdf_arrays = (
                 sdf_arrays
-                .withColumn('sw_' + item, udf_make_sliding_window(f.col(item + '_forward_filled')))
+                .withColumn('sw_' + item, udf_make_sliding_window(f.col(item + '_sorted')))
             )
         for item in item_list:
-            sdf_arrays = sdf_arrays.drop(item + '_forward_filled')
+            sdf_arrays = sdf_arrays.drop(item + '_sorted')
 
-        sdf_arrays.show(2)
 
-        #
-        # prepare to explode arrays
-        #
-        # sdf_arrays = sdf_arrays.drop('timestamps_all')
+
+        
+        # #
+        # # prepare to explode arrays
+        # #
+        # # sdf_arrays = sdf_arrays.drop('timestamps_all')
        
-        # #
-        # # test
-        # #
-        # for item in item_list:
-        #     sdf_arrays = (
-        #         sdf_arrays
-        #         .withColumn(item + '_len', f.array_size(f.col('sw_' + item)))
-        # )
+        # # #
+        # # # test
+        # # #
+        # # for item in item_list:
+        # #     sdf_arrays = (
+        # #         sdf_arrays
+        # #         .withColumn(item + '_len', f.array_size(f.col('sw_' + item)))
+        # # )
 
-        #
-        # explode arrays
-        #
-        sdf_arrays = (
-            sdf_arrays
-            .withColumn('zipped_array', f.arrays_zip('timestamps_all', 'sw_return', 'sw_volatility', 'sw_volume', 'sw_lhc_mean', 'sw_sin', 'sw_cos'))
-            .withColumn('zipped_array', f.explode('zipped_array'))
-            .select(
-                'date_post_shift',
-                f.col('zipped_array.timestamps_all').alias('timestamp'),
-                f.col('zipped_array.sw_return').alias('return'),
-                f.col('zipped_array.sw_volatility').alias('volatility'),
-                f.col('zipped_array.sw_volume').alias('volume'),
-                f.col('zipped_array.sw_lhc_mean').alias('lhc_mean'),
-                f.col('zipped_array.sw_sin').alias('sin'),
-                f.col('zipped_array.sw_cos').alias('cos'),
-            )
-        )
+        # #
+        # # explode arrays
+        # #
+        # sdf_arrays = (
+        #     sdf_arrays
+        #     .withColumn('zipped_array', f.arrays_zip('timestamps_all', 'sw_return', 'sw_volatility', 'sw_volume', 'sw_lhc_mean', 'sw_sin', 'sw_cos'))
+        #     .withColumn('zipped_array', f.explode('zipped_array'))
+        #     .select(
+        #         'date_post_shift',
+        #         f.col('zipped_array.timestamps_all').alias('timestamp'),
+        #         f.col('zipped_array.sw_return').alias('return'),
+        #         f.col('zipped_array.sw_volatility').alias('volatility'),
+        #         f.col('zipped_array.sw_volume').alias('volume'),
+        #         f.col('zipped_array.sw_lhc_mean').alias('lhc_mean'),
+        #         f.col('zipped_array.sw_sin').alias('sin'),
+        #         f.col('zipped_array.sw_cos').alias('cos'),
+        #     )
+        # )
         
 
-        full_exploded_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_exploded_9754759d-2884-4612-8f32-35e6687b7a16.parquet'
+        # full_exploded_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_exploded_9754759d-2884-4612-8f32-35e6687b7a16.parquet'
 
-        sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
+        # sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
             
-        sdf_arrays.show(2)
+        # sdf_arrays.show(2)
         return {'words' : 'words'}
         
     
