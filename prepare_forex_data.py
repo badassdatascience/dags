@@ -4,8 +4,8 @@ from airflow.decorators import dag, task
 
 
 # temp
-debug_mode = False
-#run_id = '9754759d-2884-4612-8f32-35e6687b7a16'
+debug_mode = True
+run_id = '309457bc-a227-4332-8c0b-2cf5dd38749c'
 run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
 
 #
@@ -392,7 +392,7 @@ def PrepareForexData():
             .getOrCreate()
         )
         
-        full_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_9754759d-2884-4612-8f32-35e6687b7a16.parquet'
+        full_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_' + run_id + '.parquet'
         sdf_arrays = spark.read.parquet(full_output_path)
 
 
@@ -403,7 +403,7 @@ def PrepareForexData():
         #   For debugging   #
         #####################
         
-        # sdf_arrays = sdf_arrays.limit(5)
+        sdf_arrays = sdf_arrays.limit(5)
 
         ######################
         #   Deal with NaNs   #
@@ -421,13 +421,8 @@ def PrepareForexData():
         #   Add trig functions   #
         ##########################
         
-        from utilities.trig import udf_sin_24_hours, udf_cos_24_hours
-        sdf_arrays = (
-            sdf_arrays
-            .withColumn('sin_forward_filled', udf_sin_24_hours(f.col('timestamps_all')))
-            .withColumn('cos_forward_filled', udf_cos_24_hours(f.col('timestamps_all')))
-        )
-        sdf_arrays.show(2)
+        from utilities.trig import add_trig_functions_spark
+        sdf_arrays = add_trig_functions_spark(sdf_arrays)
 
         ###############################
         #   Ensure order is correct   #
