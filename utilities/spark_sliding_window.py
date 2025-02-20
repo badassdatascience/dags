@@ -61,3 +61,19 @@ def find_too_short(
         column_name = 'timestamps_all_sorted_length',
 ):
     return df.where(f.col(column_name) >= (n_back + n_forward + offset))
+
+def do_sliding_window(df):
+    
+    item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
+
+    for item in item_list:
+        df = (
+            df
+            .withColumn('sw_' + item, udf_make_sliding_window_float(f.col(item + '_sorted')))
+        )
+    for item in item_list:
+        df = df.drop(item + '_sorted')
+
+    df = df.withColumn('sw_timestamps', udf_make_sliding_window_int(f.col('timestamps_all_sorted')))
+
+    return df

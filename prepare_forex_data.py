@@ -466,86 +466,43 @@ def PrepareForexData():
                         
         sdf_arrays.show(2)
 
+        
         ###############################################
         #   Find lists too short for sliding window   #
         ###############################################
 
-        # I don't know why there is only one row that is two short
+        # I don't know YET why there is only one row that is two short
 
         from utilities.spark_sliding_window import find_too_short
         sdf_arrays = find_too_short(sdf_arrays)
         sdf_arrays.show(2)
+
         
         ######################
         #   Sliding window   #
         ######################
         
-        print()
-        print('Sliding Window')
-        print()
+        from utilities.spark_sliding_window import do_sliding_window
+        sdf_arrays = do_sliding_window(sdf_arrays)
         
-        from utilities.spark_sliding_window import udf_make_sliding_window_float, udf_make_sliding_window_int
-
-        item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
-
-        for item in item_list:
-            sdf_arrays = (
-                sdf_arrays
-                .withColumn('sw_' + item, udf_make_sliding_window_float(f.col(item + '_sorted')))
-            )
-        for item in item_list:
-            sdf_arrays = sdf_arrays.drop(item + '_sorted')
-
-        sdf_arrays = sdf_arrays.withColumn('sw_timestamps', udf_make_sliding_window_int(f.col('timestamps_all_sorted')))
-            
-        
-        sdf_arrays.show(2)
-
-        
-        #################################
-        #   Prepare to explode arrays   #
-        #################################
-        
-
-        # # sdf_arrays = sdf_arrays.drop('timestamps_all')
-
-        # #
-        # # test
-        # #
-        # for item in item_list:
-        #     sdf_arrays = (
-        #         sdf_arrays
-        #         .withColumn(item + '_len', f.array_size(f.col('sw_' + item)))
-        # )
 
         ######################
         #   Explode arrays   #
         ######################
-        
-        sdf_arrays = (
-            sdf_arrays
-            .withColumn('zipped_array', f.arrays_zip('timestamps_all_sorted', 'sw_timestamps', 'sw_return', 'sw_volatility', 'sw_volume', 'sw_lhc_mean', 'sw_sin', 'sw_cos'))
-            .withColumn('zipped_array', f.explode('zipped_array'))
-            .select(
-                'date_post_shift',
-                f.col('zipped_array.timestamps_all_sorted').alias('timestamps_start'),
-                f.col('zipped_array.sw_timestamps').alias('timestamps'),
-                f.col('zipped_array.sw_return').alias('return'),
-                f.col('zipped_array.sw_volatility').alias('volatility'),
-                f.col('zipped_array.sw_volume').alias('volume'),
-                f.col('zipped_array.sw_lhc_mean').alias('lhc_mean'),
-                f.col('zipped_array.sw_sin').alias('sin'),
-                f.col('zipped_array.sw_cos').alias('cos'),
-            )
-        )
-        
 
-        full_exploded_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_exploded_9754759d-2884-4612-8f32-35e6687b7a16.parquet'
-
-        sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
-            
+        from utilities.spark_explode import spark_explode_it
+        sdf_arrays = spark_explode_it(sdf_arrays)
         sdf_arrays.show(2)
 
+        
+        ###############################
+        #   Save results and return   #
+        ###############################
+        
+        full_exploded_output_path = run_dir + '/spark_exploded_' + run_id
+        sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
+
+        
         return {'words' : 'words'}
         
     
