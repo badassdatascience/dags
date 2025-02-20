@@ -391,6 +391,10 @@ def PrepareForexData():
             .config(conf = spark_config)
             .getOrCreate()
         )
+
+
+
+
         
         full_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_' + run_id + '.parquet'
         sdf_arrays = spark.read.parquet(full_output_path)
@@ -413,85 +417,30 @@ def PrepareForexData():
         sdf_arrays = dwn.deal_with_nans(sdf_arrays)
                 
         sdf_arrays.show(2)
-
-
-        
         
         ##########################
         #   Add trig functions   #
         ##########################
         
-        from utilities.trig import add_trig_functions_spark
+        from utilities.spark_trig import add_trig_functions_spark
         sdf_arrays = add_trig_functions_spark(sdf_arrays)
 
         ###############################
         #   Ensure order is correct   #
         ###############################
 
+        from utilities.spark_sort import ensure_sort
+        
         print()
         print('ORDER')
         print()
 
-        def calculate_order(timestamp_list):
-            import numpy as np # ?
-            tl = np.array(timestamp_list)
-            to_return = [int(x) for x in np.argsort(tl)]
-            return to_return
-
-        udf_calculate_order = f.udf(calculate_order, ArrayType(IntegerType()))
-
-        # [[1.3312267, 1.33...
-        # [[1.32732, 1.3273..
-        #
-        def ensure_sort_float(timestamp_sort_list, values_list):
-            import numpy as np
-            ts = np.array(timestamp_sort_list)
-            v = np.array(values_list)
-            to_return = [float(x) for x in v[ts]]
-            return to_return
-
-        udf_ensure_sort_float = f.udf(ensure_sort_float, ArrayType(FloatType()))
-
-        def ensure_sort_int(timestamp_sort_list, values_list):
-            import numpy as np
-            ts = np.array(timestamp_sort_list)
-            v = np.array(values_list)
-            to_return = [int(x) for x in v[ts]]
-            return to_return
-
-        udf_ensure_sort_int = f.udf(ensure_sort_int, ArrayType(IntegerType()))
-
-
-
-        
-        sdf_arrays = sdf_arrays.withColumn('timestamps_sorted', udf_calculate_order(f.col('timestamps_all')))
-
-        item_list = ['timestamps_all', 'return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
-        for item in item_list:
-            if item == 'timestamps_all':
-                sdf_arrays = sdf_arrays.withColumn(item + '_sorted', udf_ensure_sort_int(f.col('timestamps_sorted'), f.col(item)))
-            else:
-                sdf_arrays = sdf_arrays.withColumn(item + '_sorted', udf_ensure_sort_float(f.col('timestamps_sorted'), f.col(item + '_forward_filled')))
-
-                
-        item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
-        for item in item_list:
-            sdf_arrays = sdf_arrays.drop(item + '_forward_filled')
-
-        sdf_arrays = (
-            sdf_arrays
-            .drop('timestamps_sorted', 'timestamps_all')
-        )
-        
-
+        sdf_arrays = ensure_sort(sdf_arrays)
             
         sdf_arrays.show(2)
 
-        print()
         print('ORDER CLOSED')
         print()
-                                                   
-
         
         ################################
         #   QA before sliding window   #
