@@ -471,14 +471,9 @@ def PrepareForexData():
         ###############################################
 
         # I don't know why there is only one row that is two short
-        
-        # temp
-        n_back = 180
-        n_forward = 30
-        offset = 1
-        
-        sdf_arrays = sdf_arrays.where(f.col('timestamps_all_sorted_length') >= (n_back + n_forward + offset))
-        
+
+        from utilities.spark_sliding_window import find_too_short
+        sdf_arrays = find_too_short(sdf_arrays)
         sdf_arrays.show(2)
         
         ######################
@@ -489,19 +484,19 @@ def PrepareForexData():
         print('Sliding Window')
         print()
         
-        from utilities.spark_sliding_window import udf_make_sliding_window
+        from utilities.spark_sliding_window import udf_make_sliding_window_float, udf_make_sliding_window_int
 
         item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
 
         for item in item_list:
             sdf_arrays = (
                 sdf_arrays
-                .withColumn('sw_' + item, udf_make_sliding_window(f.col(item + '_sorted')))
+                .withColumn('sw_' + item, udf_make_sliding_window_float(f.col(item + '_sorted')))
             )
         for item in item_list:
             sdf_arrays = sdf_arrays.drop(item + '_sorted')
 
-        sdf_arrays = sdf_arrays.withColumn('sw_timestamps', udf_make_sliding_window(f.col('timestamps_all_sorted')))
+        sdf_arrays = sdf_arrays.withColumn('sw_timestamps', udf_make_sliding_window_int(f.col('timestamps_all_sorted')))
             
         
         sdf_arrays.show(2)
