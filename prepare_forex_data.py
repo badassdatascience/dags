@@ -361,46 +361,26 @@ def PrepareForexData():
     def deal_with_nans():
 
         import numpy as np
-        
-        from pyspark import SparkConf
-        from pyspark.sql import SparkSession
         import pyspark.sql.functions as f
         from pyspark.sql.types import BooleanType, IntegerType, ArrayType, FloatType
         
-        #
-        # move this to a config file
-        #
-        spark_config = SparkConf().setAll(
-            [
-                ('spark.executor.memory', '15g'),
-                ('spark.executor.cores', '3'),
-                ('spark.cores.max', '3'),
-                ('spark.driver.memory', '15g'),
-                ('spark.sql.execution.arrow.pyspark.enabled', 'true'),
-            ]
-        )
 
-        #
-        # define spark session
-        #
-        spark = (
-            SparkSession
-            .builder
-            .master('local[*]')
-            .appName('forex_prep')
-            .config(conf = spark_config)
-            .getOrCreate()
-        )
+        ###########################
+        #   Get a Spark session   #
+        ###########################
 
-
-
+        # this MAY only be necessary for debugging... not sure yet
+        
+        from utilities.spark_session import get_spark_session
+        spark = get_spark_session()
 
         
-        full_output_path = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_' + run_id + '.parquet'
+        ##########################################
+        #   Load the data (temporary debugging)  #
+        ##########################################
+        
+        full_output_path = run_dir + '/spark_' + run_id + '.parquet'
         sdf_arrays = spark.read.parquet(full_output_path)
-
-
-        
 
         
         #####################
@@ -409,14 +389,14 @@ def PrepareForexData():
         
         sdf_arrays = sdf_arrays.limit(5)
 
+        
         ######################
         #   Deal with NaNs   #
         ######################
         
-        import utilities.deal_with_nans as dwn
+        import utilities.spark_deal_with_nans as dwn
         sdf_arrays = dwn.deal_with_nans(sdf_arrays)
-                
-        sdf_arrays.show(2)
+
         
         ##########################
         #   Add trig functions   #
@@ -425,22 +405,14 @@ def PrepareForexData():
         from utilities.spark_trig import add_trig_functions_spark
         sdf_arrays = add_trig_functions_spark(sdf_arrays)
 
+        
         ###############################
         #   Ensure order is correct   #
         ###############################
 
         from utilities.spark_sort import ensure_sort
-        
-        print()
-        print('ORDER')
-        print()
-
         sdf_arrays = ensure_sort(sdf_arrays)
-            
-        sdf_arrays.show(2)
 
-        print('ORDER CLOSED')
-        print()
         
         ################################
         #   QA before sliding window   #
@@ -517,7 +489,7 @@ def PrepareForexData():
         print('Sliding Window')
         print()
         
-        from utilities.sliding_window import udf_make_sliding_window
+        from utilities.spark_sliding_window import udf_make_sliding_window
 
         item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
 
