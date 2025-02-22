@@ -62,6 +62,7 @@ def find_too_short(
 ):
     return df.where(f.col(column_name) >= (n_back + n_forward + offset))
 
+
 def do_sliding_window(df):
     
     item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']

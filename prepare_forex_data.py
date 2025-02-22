@@ -5,8 +5,11 @@ from airflow.decorators import dag, task
 
 # temp
 debug_mode = True
+limit_5 = True
 run_id = '309457bc-a227-4332-8c0b-2cf5dd38749c'
 run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
+
+n_step = 100 # also temp
 
 #
 # not sure this is the best place
@@ -318,7 +321,8 @@ def PrepareForexData():
             #
             # for debugging only
             #
-            #sdf = sdf.limit(5)
+            if limit_5:
+                sdf = sdf.limit(5)
             sdf.show(3)
 
             #
@@ -357,6 +361,10 @@ def PrepareForexData():
         to_return = {'sdf_arrays_full_output_path' : full_output_path}
         return to_return
 
+    ######################
+    #   Deal with NaNs   #
+    ######################
+    
     @task()
     def deal_with_nans():
 
@@ -373,6 +381,7 @@ def PrepareForexData():
         
         from utilities.spark_session import get_spark_session
         spark = get_spark_session()
+        spark.catalog.clearCache()  # will this help?
 
         
         ##########################################
@@ -382,12 +391,19 @@ def PrepareForexData():
         full_output_path = run_dir + '/spark_' + run_id + '.parquet'
         sdf_arrays = spark.read.parquet(full_output_path)
 
+        print()
+        sdf_arrays.show(2)
+        print()
+        print(sdf_arrays.count())
+        print()
+
         
         #####################
         #   For debugging   #
         #####################
-        
-        sdf_arrays = sdf_arrays.limit(5)
+
+        if limit_5:
+            sdf_arrays = sdf_arrays.limit(5)
 
         
         ######################
@@ -466,6 +482,18 @@ def PrepareForexData():
                         
         sdf_arrays.show(2)
 
+
+        print()
+        (
+            sdf_arrays
+            .agg(
+                f.min('timestamps_all_sorted_length').alias('the_min'),
+                f.max('timestamps_all_sorted_length').alias('the_max'),
+            )
+            .show(10)
+        )
+        print()
+        
         
         ###############################################
         #   Find lists too short for sliding window   #
@@ -476,7 +504,7 @@ def PrepareForexData():
         from utilities.spark_sliding_window import find_too_short
         sdf_arrays = find_too_short(sdf_arrays)
         sdf_arrays.show(2)
-
+        
         
         ######################
         #   Sliding window   #
@@ -484,8 +512,9 @@ def PrepareForexData():
         
         from utilities.spark_sliding_window import do_sliding_window
         sdf_arrays = do_sliding_window(sdf_arrays)
+        sdf_arrays.show(2)
+                
         
-
         ######################
         #   Explode arrays   #
         ######################
@@ -494,6 +523,89 @@ def PrepareForexData():
         sdf_arrays = spark_explode_it(sdf_arrays)
         sdf_arrays.show(2)
 
+
+        ####### QA-ish
+
+        items_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
+        for item in items_list:
+            sdf_arrays = sdf_arrays.withColumn('size_' + item, f.array_size(f.col(item)))
+        sdf_arrays = sdf_arrays.withColumn('size_timestamps', f.array_size(f.col('timestamps')))
+
+        # I might repeat this elsewhere. Check later...
+        def test_length_2(len_timestamps, len_returns, len_volatility, len_volume, len_lhc_mean, len_sine, len_cosine):
+            to_return = (
+                (len_timestamps == len_returns) &
+                (len_returns == len_volatility) &
+                (len_volatility == len_volume) &
+                (len_volume == len_lhc_mean) &
+                (len_lhc_mean == len_sine) &
+                (len_sine == len_cosine)
+            )
+            return to_return
+
+        udf_test_length_2 = f.udf(test_length_2, BooleanType())
+       
+        sdf_arrays = (
+            sdf_arrays
+            .withColumn(
+                'column_length_status',
+                udf_test_length_2(
+                    f.col('size_timestamps'),
+                    f.col('size_return'),
+                    f.col('size_volatility'),
+                    f.col('size_volume'),
+                    f.col('size_lhc_mean'),
+                    f.col('size_sin'),
+                    f.col('size_cos'),
+                )
+            )
+        )
+
+        sdf_arrays = (
+            sdf_arrays
+            .where(f.col('column_length_status') == True)
+            .drop('column_length_status')
+            .drop('size_return', 'size_volatility', 'size_volume', 'size_lhc_mean', 'size_sin', 'size_cos')
+            .withColumn('timestamp_first', f.col('timestamps')[0])
+        )
+        
+        print()
+        sdf_arrays.show(10)
+        print()
+        print(sdf_arrays.count())
+        print()
+
+        print()
+        (
+            sdf_arrays
+            .agg(
+                f.min('size_timestamps').alias('the_min'),
+                f.max('size_timestamps').alias('the_max'),
+                f.mean('size_timestamps').alias('the_mean'),
+            )
+            .show(10)
+        )
+        print()
+
+        (
+            sdf_arrays.select('size_timestamps').distinct().show(10)
+        )
+
+        print()
+        sdf_arrays.where(f.col('size_timestamps').isNull()).show(10)
+        print()
+        
+        spark.stop(); import sys; sys.exit(0)
+
+        #######
+
+
+
+
+
+
+        
+        
         
         ###############################
         #   Save results and return   #
@@ -502,7 +614,31 @@ def PrepareForexData():
         full_exploded_output_path = run_dir + '/spark_exploded_' + run_id
         sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
 
+
+
+        ############
+        #   Huh?   #
+        ############
+
+        print()
+        (
+            sdf_arrays
+            .withColumn('has_null', sdf_arrays['timestamps'].isNotNull())
+            .groupBy('has_null')
+            .agg(f.count('timestamps').alias('count'))
+            .show(5)
+        )
+        print()
         
+
+            #.where(sdf_arrays['timestamps'].isNotNull())  # 6155
+            #.where(sdf_arrays['timestamps'].isNull())  # 1045
+
+
+
+
+
+        #spark.stop()
         return {'words' : 'words'}
         
     
