@@ -10,10 +10,10 @@ def get_spark_session():
     #
     spark_config = SparkConf().setAll(
         [
-            ('spark.executor.memory', '15g'),
-            ('spark.executor.cores', '3'),
-            ('spark.cores.max', '3'),
-            ('spark.driver.memory', '15g'),
+            ('spark.executor.memory', '100g'),
+            ('spark.executor.cores', '10'),
+            ('spark.cores.max', '10'),
+            ('spark.driver.memory', '100g'),
             ('spark.sql.execution.arrow.pyspark.enabled', 'true'),
         ]
     )

@@ -494,6 +494,12 @@ def PrepareForexData():
         )
         print()
         
+
+        sdf_arrays.show(2)
+        print()
+
+        
+
         
         ###############################################
         #   Find lists too short for sliding window   #
@@ -505,16 +511,24 @@ def PrepareForexData():
         sdf_arrays = find_too_short(sdf_arrays)
         sdf_arrays.show(2)
         
+        # # are there NULLs at this point?
+        # print()
+        # sdf_arrays.where(f.col('timestamps_all_sorted_length') <= 300).show()
+        # print()
+        
         
         ######################
         #   Sliding window   #
         ######################
         
         from utilities.spark_sliding_window import do_sliding_window
-        sdf_arrays = do_sliding_window(sdf_arrays)
+        sdf_arrays = (
+            do_sliding_window(sdf_arrays)
+            .dropna()
+        )
         sdf_arrays.show(2)
-                
-        
+
+       
         ######################
         #   Explode arrays   #
         ######################
@@ -523,7 +537,7 @@ def PrepareForexData():
         sdf_arrays = spark_explode_it(sdf_arrays)
         sdf_arrays.show(2)
 
-
+        
         #######################################################
         #   QA:  Figure out where the NULLs are coming from   #
         #######################################################
@@ -579,51 +593,66 @@ def PrepareForexData():
             .drop('size_return', 'size_volatility', 'size_volume', 'size_lhc_mean', 'size_sin', 'size_cos')
             .withColumn('timestamp_first', f.col('timestamps')[0])
         )
+
+
+
+
+
         
-        print()
-        sdf_arrays.show(10)
-        print()
-        print(sdf_arrays.count())
-        print()
-
-        print()
-        (
-            sdf_arrays
-            .agg(
-                f.min('size_timestamps').alias('the_min'),
-                f.max('size_timestamps').alias('the_max'),
-                f.mean('size_timestamps').alias('the_mean'),
-            )
-            .show(10)
-        )
-        print()
-
-        (
-            sdf_arrays.select('size_timestamps').distinct().show(10)
-        )
-
         #
-        # Where are these NULLs coming from?
+        # This prompts an error
         #
-        print()
-        sdf_arrays.where(f.col('size_timestamps').isNull()).show(10)
-        print()
+        # print()
+        # (
+        #     sdf_arrays
+        #     .groupBy('size_timestamps')
+        #     .agg(
+        #         f.count('size_timestamps').alias('count')
+        #     )
+        # ).show(10)
+        # print()
 
-        # this is not giving clear results
-        (
-            sdf_arrays
-            .withColumn('not_null', sdf_arrays['timestamps'].isNotNull())
-            .groupBy('not_null')
-            .agg(f.count('timestamps').alias('count'))
-            .show(10)
-        )
-        print()
 
-        #
-        # Save the version with NULLs for later investigation
-        #
-        full_exploded_with_NULLs_output_path = run_dir + '/spark_exploded_with_NULLs_' + run_id
-        sdf_arrays.write.mode('overwrite').parquet(full_exploded_with_NULLs_output_path)
+
+        
+        # (
+        #     sdf_arrays.select('size_timestamps').distinct().show(10)
+        # )
+
+
+
+
+        
+        # #
+        # # Where are these NULLs coming from?
+        # #
+        # print()
+        # sdf_arrays.where(f.col('size_timestamps').isNull()).show(10)
+        # print()
+
+
+        
+
+
+
+
+        
+        # # this is not giving clear results
+        # (
+        #     sdf_arrays
+        #     .withColumn('not_null', sdf_arrays['timestamps'].isNotNull())
+        #     .groupBy('not_null')
+        #     .agg(f.count('timestamps').alias('count'))
+        #     .show(10)
+        # )
+        # print()
+
+        
+        # #
+        # # Save the version with NULLs for later investigation
+        # #
+        # full_exploded_with_NULLs_output_path = run_dir + '/spark_exploded_with_NULLs_' + run_id
+        # sdf_arrays.write.mode('overwrite').parquet(full_exploded_with_NULLs_output_path)
         
         #
         # Remove the NULLs for now (and investigate why there are NULLs in the near future...)
@@ -633,12 +662,8 @@ def PrepareForexData():
             .withColumn('not_null', sdf_arrays['timestamps'].isNotNull())
             .where(f.col('not_null') == True)
             .drop('not_null')
+            .dropna()
         )
-        print()
-        sdf_arrays.show(3)
-        print()
-        print(sdf_arrays.count())
-        print()
         
         #######
 
@@ -649,23 +674,47 @@ def PrepareForexData():
 
         # here we are saving the version without NULLs
 
-        full_exploded_sans_NULLs_output_path = run_dir + '/spark_exploded_sans_NULLs_' + run_id
-        sdf_arrays.write.mode('overwrite').parquet(full_exploded_sans_NULLs_output_path)
+        sdf_arrays = sdf_arrays.drop('timestamps').dropna()
+
+        sdf_arrays.show(2)
+        
+        full_exploded_output_path = run_dir + '/spark_exploded_' + run_id + '.parquet'
+        sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
 
         
         ##############
         #   Return   #
         ##############
 
-        spark.stop()
+        #spark.stop()
         
         to_return = {
-            'full_exploded_sans_NULLs_output_path' : full_exploded_sans_NULLs_output_path,
-            'full_exploded_with_NULLs_output_path' : full_exploded_with_NULLs_output_path,
+            'full_exploded_output_path' : full_exploded_output_path,
         }
         
         return to_return
-        
+
+    ###############
+    #   X and y   #
+    ###############
+    
+    @task()
+    def derive_X_and_y(
+            spark_exploded_data_dict : dict,
+    ):
+
+        import numpy as np
+        import pyspark.sql.functions as f
+        from pyspark.sql.types import BooleanType, IntegerType, ArrayType, FloatType
+
+        # this MAY only be necessary for debugging... not sure yet
+        from utilities.spark_session import get_spark_session
+        spark = get_spark_session()
+        spark.catalog.clearCache()  # will this help?
+
+        #sdf_arrays = spark.read.parquet(full_output_path)
+            
+    
     
     #
     # define pipeline component order and dependencies
@@ -684,8 +733,12 @@ def PrepareForexData():
         # debugging
         #
 
-        nans_dict = deal_with_nans()
+        # What arguments go here? A filepath?
+        nans_dict = deal_with_nans()  
 
+        #full_exploded_output_path = run_dir + '/spark_exploded_' + run_id
+
+        
         print()
         import pprint as pp
         pp.pprint(nans_dict)
