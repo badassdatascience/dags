@@ -5,7 +5,7 @@ from airflow.decorators import dag, task
 
 # temp
 debug_mode = True
-limit_5 = True
+limit_5 = False
 run_id = '309457bc-a227-4332-8c0b-2cf5dd38749c'
 run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
 
@@ -524,8 +524,19 @@ def PrepareForexData():
         sdf_arrays.show(2)
 
 
-        ####### QA-ish
+        #######################################################
+        #   QA:  Figure out where the NULLs are coming from   #
+        #######################################################
 
+        #
+        # we are also measuring array lengths in this code...
+        # ...so refactor this baby
+        #
+
+
+
+        
+        
         items_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
         for item in items_list:
             sdf_arrays = sdf_arrays.withColumn('size_' + item, f.array_size(f.col(item)))
@@ -591,55 +602,69 @@ def PrepareForexData():
             sdf_arrays.select('size_timestamps').distinct().show(10)
         )
 
+        #
+        # Where are these NULLs coming from?
+        #
         print()
         sdf_arrays.where(f.col('size_timestamps').isNull()).show(10)
         print()
-        
-        spark.stop(); import sys; sys.exit(0)
 
+        # this is not giving clear results
+        (
+            sdf_arrays
+            .withColumn('not_null', sdf_arrays['timestamps'].isNotNull())
+            .groupBy('not_null')
+            .agg(f.count('timestamps').alias('count'))
+            .show(10)
+        )
+        print()
+
+        #
+        # Save the version with NULLs for later investigation
+        #
+        full_exploded_with_NULLs_output_path = run_dir + '/spark_exploded_with_NULLs_' + run_id
+        sdf_arrays.write.mode('overwrite').parquet(full_exploded_with_NULLs_output_path)
+        
+        #
+        # Remove the NULLs for now (and investigate why there are NULLs in the near future...)
+        #
+        sdf_arrays = (
+            sdf_arrays
+            .withColumn('not_null', sdf_arrays['timestamps'].isNotNull())
+            .where(f.col('not_null') == True)
+            .drop('not_null')
+        )
+        print()
+        sdf_arrays.show(3)
+        print()
+        print(sdf_arrays.count())
+        print()
+        
         #######
 
 
+        ####################
+        #   Save results   #
+        ####################
 
+        # here we are saving the version without NULLs
 
-
+        full_exploded_sans_NULLs_output_path = run_dir + '/spark_exploded_sans_NULLs_' + run_id
+        sdf_arrays.write.mode('overwrite').parquet(full_exploded_sans_NULLs_output_path)
 
         
+        ##############
+        #   Return   #
+        ##############
+
+        spark.stop()
         
+        to_return = {
+            'full_exploded_sans_NULLs_output_path' : full_exploded_sans_NULLs_output_path,
+            'full_exploded_with_NULLs_output_path' : full_exploded_with_NULLs_output_path,
+        }
         
-        ###############################
-        #   Save results and return   #
-        ###############################
-        
-        full_exploded_output_path = run_dir + '/spark_exploded_' + run_id
-        sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
-
-
-
-        ############
-        #   Huh?   #
-        ############
-
-        print()
-        (
-            sdf_arrays
-            .withColumn('has_null', sdf_arrays['timestamps'].isNotNull())
-            .groupBy('has_null')
-            .agg(f.count('timestamps').alias('count'))
-            .show(5)
-        )
-        print()
-        
-
-            #.where(sdf_arrays['timestamps'].isNotNull())  # 6155
-            #.where(sdf_arrays['timestamps'].isNull())  # 1045
-
-
-
-
-
-        #spark.stop()
-        return {'words' : 'words'}
+        return to_return
         
     
     #
@@ -659,14 +684,13 @@ def PrepareForexData():
         # debugging
         #
 
-        deal_with_nans()
+        nans_dict = deal_with_nans()
 
+        print()
+        import pprint as pp
+        pp.pprint(nans_dict)
+        print()
         
-        moved_to_spark_dict = {
-            'sdf_arrays_full_output_path': run_dir + '/spark_' + run_id + '.parquet',
-        }
-
-
     
 
 
