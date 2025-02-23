@@ -14,13 +14,13 @@ def make_sliding_window_float(
     n_back = 180
     n_forward = 30
     offset = 1
-    #n_step = n_step
+    n_step = 30
 
     arr = np.array(values_array)
     if len(arr) <= n_back + n_forward + offset:
         return None  # clean this up
     else:
-        swv = sliding_window_view(arr, n_back + n_forward)
+        swv = sliding_window_view(arr, n_back + n_forward)[::n_step]
 
     to_return = []
     for i in range(0, swv.shape[0]):

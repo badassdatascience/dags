@@ -5,11 +5,12 @@ from airflow.decorators import dag, task
 
 # temp
 debug_mode = True
-limit_5 = True
+limit_5 = False
 run_id = '309457bc-a227-4332-8c0b-2cf5dd38749c'
 run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
+n_processors = 20
 
-n_step = 100 # also temp
+
 
 #
 # not sure this is the best place
@@ -397,6 +398,11 @@ def PrepareForexData():
         print(sdf_arrays.count())
         print()
 
+        ############
+        #   Test   #
+        ############
+
+        sdf_arrays = sdf_arrays.coalesce(n_processors)
         
         #####################
         #   For debugging   #
@@ -498,8 +504,11 @@ def PrepareForexData():
         sdf_arrays.show(2)
         print()
 
-        
+        ############
+        #   Test   #
+        ############
 
+        sdf_arrays = sdf_arrays.coalesce(n_processors)
         
         ###############################################
         #   Find lists too short for sliding window   #
@@ -535,7 +544,14 @@ def PrepareForexData():
 
         from utilities.spark_explode import spark_explode_it
         sdf_arrays = spark_explode_it(sdf_arrays)
-        sdf_arrays.show(2)
+       
+       
+        ############
+        #   Test   #
+        ############
+
+        sdf_arrays = sdf_arrays.coalesce(n_processors)
+
 
         
         #######################################################
@@ -668,15 +684,42 @@ def PrepareForexData():
         #######
 
 
+        
+        
+        ############
+        #   Test   #
+        ############
+
+        sdf_arrays = sdf_arrays.coalesce(n_processors)
+
+
+        ######################
+        #   Final clean up   #
+        ######################
+
+        sdf_arrays = sdf_arrays.drop('timestamps', 'size_timestamps').dropna()
+
+
+        # #####################
+        # #   Get Nth items   #
+        # #####################
+
+        # from utilities.spark_n_row import get_nth_rows
+        # spark.conf.set("spark.sql.shuffle.partitions", 10)  # temp
+        
+        # sdf_arrays = get_nth_rows(sdf_arrays)
+
+        # print()
+        # sdf_arrays.show(10)
+        # print()
+        
+        
         ####################
         #   Save results   #
         ####################
 
-        # here we are saving the version without NULLs
-
-        sdf_arrays = sdf_arrays.drop('timestamps').dropna()
-
-        sdf_arrays.show(2)
+        # Test
+        sdf_arrays = sdf_arrays.coalesce(n_processors)
         
         full_exploded_output_path = run_dir + '/spark_exploded_' + run_id + '.parquet'
         sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
@@ -686,7 +729,7 @@ def PrepareForexData():
         #   Return   #
         ##############
 
-        #spark.stop()
+        spark.stop()
         
         to_return = {
             'full_exploded_output_path' : full_exploded_output_path,
@@ -694,113 +737,113 @@ def PrepareForexData():
         
         return to_return
 
-    ###############
-    #   X and y   #
-    ###############
+    # ###############
+    # #   X and y   #
+    # ###############
     
-    @task()
-    def derive_X_and_y(
-            #spark_exploded_data_dict : dict,
-    ):
+    # @task()
+    # def derive_X_and_y(
+    #         #spark_exploded_data_dict : dict,
+    # ):
 
-        import numpy as np
-        import pyspark.sql.functions as f
-        from pyspark.sql.types import BooleanType, IntegerType, ArrayType, FloatType
+    #     import numpy as np
+    #     import pyspark.sql.functions as f
+    #     from pyspark.sql.types import BooleanType, IntegerType, ArrayType, FloatType
 
-        # this MAY only be necessary for debugging... not sure yet
-        from utilities.spark_session import get_spark_session
-        spark = get_spark_session()
-        spark.catalog.clearCache()  # will this help?
+    #     # this MAY only be necessary for debugging... not sure yet
+    #     from utilities.spark_session import get_spark_session
+    #     spark = get_spark_session()
+    #     spark.catalog.clearCache()  # will this help?
 
-        full_exploded_output_path = run_dir + '/spark_exploded_' + run_id + '.parquet'
-        sdf_arrays = (
-            spark
-            .read
-            .parquet(full_exploded_output_path)
-            .orderBy('date_post_shift', 'timestamp_first')
-        )
-        sdf_arrays.show(5)
+    #     full_exploded_output_path = run_dir + '/spark_exploded_' + run_id + '.parquet'
+    #     sdf_arrays = (
+    #         spark
+    #         .read
+    #         .parquet(full_exploded_output_path)
+    #         .orderBy('date_post_shift', 'timestamp_first')
+    #     )
+    #     sdf_arrays.show(5)
             
 
-        def X_it(array):
-            n_back = 180
-            X = array[0:n_back]
-            return X
+    #     def X_it(array):
+    #         n_back = 180
+    #         X = array[0:n_back]
+    #         return X
 
-        udf_X_it = f.udf(X_it, ArrayType(FloatType()))
+    #     udf_X_it = f.udf(X_it, ArrayType(FloatType()))
 
-        def y_it(array):
-            n_back = 180
-            n_forward = 30
-            y = array[n_back:(n_back + n_forward)]
-            return y
+    #     def y_it(array):
+    #         n_back = 180
+    #         n_forward = 30
+    #         y = array[n_back:(n_back + n_forward)]
+    #         return y
 
-        udf_y_it = f.udf(y_it, ArrayType(FloatType()))
+    #     udf_y_it = f.udf(y_it, ArrayType(FloatType()))
 
-        item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
-        for item in item_list:
-            sdf_arrays = (
-                sdf_arrays
-                .withColumn(item + '_X', udf_X_it(item))
-                .withColumn(item + '_y', udf_y_it(item))
-                .drop(item)
-            )
+    #     item_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
+    #     for item in item_list:
+    #         sdf_arrays = (
+    #             sdf_arrays
+    #             .withColumn(item + '_X', udf_X_it(item))
+    #             .withColumn(item + '_y', udf_y_it(item))
+    #             .drop(item)
+    #         )
 
-        sdf_arrays = sdf_arrays.drop('size_timestamps')
+    #     sdf_arrays = sdf_arrays.drop('size_timestamps')
             
-        def stack_it(returns, volatility, volume, lhc_mean, sin, cos):
-            M = [
-                returns,
-                volatility,
-                volume,
-                lhc_mean,
-                sin,
-                cos,
-            ]
-            return M
+    #     def stack_it(returns, volatility, volume, lhc_mean, sin, cos):
+    #         M = [
+    #             returns,
+    #             volatility,
+    #             volume,
+    #             lhc_mean,
+    #             sin,
+    #             cos,
+    #         ]
+    #         return M
             
-        udf_stack_it = f.udf(stack_it, ArrayType(ArrayType(FloatType())))
+    #     udf_stack_it = f.udf(stack_it, ArrayType(ArrayType(FloatType())))
         
-        sdf_arrays = (
-            sdf_arrays
-            .withColumn('X', udf_stack_it('return_X', 'volatility_X', 'volume_X', 'lhc_mean_X', 'sin_X', 'cos_X'))
-            .drop('return_X', 'volatility_X', 'volume_X', 'lhc_mean_X', 'sin_X', 'cos_X')
-        )
+    #     sdf_arrays = (
+    #         sdf_arrays
+    #         .withColumn('X', udf_stack_it('return_X', 'volatility_X', 'volume_X', 'lhc_mean_X', 'sin_X', 'cos_X'))
+    #         .drop('return_X', 'volatility_X', 'volume_X', 'lhc_mean_X', 'sin_X', 'cos_X')
+    #     )
 
-        sdf_arrays = (
-            sdf_arrays.drop('volatility_y', 'volume_y', 'sin_y', 'cos_y')
-        )
+    #     sdf_arrays = (
+    #         sdf_arrays.drop('volatility_y', 'volume_y', 'sin_y', 'cos_y')
+    #     )
 
-        # # y
-        # sdf_arrays = (
-        #     sdf_arrays
-        #     #.withColumn('return_y_mean', f.mean(f.col('return_y')))
-        #     #.withColumn('lhc_mean_y_mean', f.mean(f.col('lhc_mean_y')))
-        #     .withColumn('return_y_min', f.array_min(f.col('return_y')))
-        #     .withColumn('lhc_mean_y_min', f.array_min(f.col('lhc_mean_y')))
-        #     .withColumn('return_y_max', f.array_max(f.col('return_y')))
-        #     .withColumn('lhc_mean_y_max', f.array_max(f.col('lhc_mean_y')))
-        #     #.withColumn('return_y_median', f.median(f.col('return_y')))
-        #     #.withColumn('lhc_mean_y_median', f.median(f.col('lhc_mean_y')))
-        # )
+    #     # # y
+    #     # sdf_arrays = (
+    #     #     sdf_arrays
+    #     #     #.withColumn('return_y_mean', f.mean(f.col('return_y')))
+    #     #     #.withColumn('lhc_mean_y_mean', f.mean(f.col('lhc_mean_y')))
+    #     #     .withColumn('return_y_min', f.array_min(f.col('return_y')))
+    #     #     .withColumn('lhc_mean_y_min', f.array_min(f.col('lhc_mean_y')))
+    #     #     .withColumn('return_y_max', f.array_max(f.col('return_y')))
+    #     #     .withColumn('lhc_mean_y_max', f.array_max(f.col('lhc_mean_y')))
+    #     #     #.withColumn('return_y_median', f.median(f.col('return_y')))
+    #     #     #.withColumn('lhc_mean_y_median', f.median(f.col('lhc_mean_y')))
+    #     # )
 
-        sdf_arrays.show(3)   
+    #     sdf_arrays.show(3)   
             
-        #
-        # to Pandas
-        #
-        pdf = sdf_arrays.toPandas()
+    #     #
+    #     # to Pandas
+    #     #
+    #     pdf = sdf_arrays.toPandas()
 
-        print()
-        print(pdf['X'].to_numpy().shape)
-        print()
-
-        
+    #     print()
+    #     print(pdf['X'].to_numpy().shape)
+    #     print()
 
         
 
+        
 
-        return {'booger' : 'booger'}
+
+    #     return {'booger' : 'booger'}
         
     
     #
@@ -821,15 +864,15 @@ def PrepareForexData():
         #
 
         # What arguments go here? A filepath?
-        # nans_dict = deal_with_nans()  
+        nans_dict = deal_with_nans()  
 
-        X_y_dict = derive_X_and_y()        
+        #X_y_dict = derive_X_and_y()        
 
         
-        print()
-        import pprint as pp
-        pp.pprint(X_y_dict)
-        print()
+        #print()
+        #import pprint as pp
+        #pp.pprint(X_y_dict)
+        #print()
         
     
 
