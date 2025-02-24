@@ -5,7 +5,7 @@ from airflow.decorators import dag, task
 
 # temp
 debug_mode = True
-limit_5 = False
+limit_5 = True
 run_id = '309457bc-a227-4332-8c0b-2cf5dd38749c'
 run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
 n_processors = 20
@@ -294,11 +294,6 @@ def PrepareForexData():
         full_output_path = run_dir + '/spark_' + run_id + '.parquet'
         sdf_arrays = spark.read.parquet(full_output_path)
 
-        print()
-        sdf_arrays.show(2)
-        print()
-        print(sdf_arrays.count())
-        print()
 
         ############
         #   Test   #
@@ -400,11 +395,6 @@ def PrepareForexData():
             )
             .show(10)
         )
-        print()
-        
-
-        sdf_arrays.show(2)
-        print()
 
         ############
         #   Test   #
@@ -423,20 +413,12 @@ def PrepareForexData():
         sdf_arrays = find_too_short(sdf_arrays)
         sdf_arrays.show(2)
         
-        # # are there NULLs at this point?
-        # print()
-        # sdf_arrays.where(f.col('timestamps_all_sorted_length') <= 300).show()
-        # print()
 
         ####################
         #   Some cleanup   #
         ####################
 
-        #sdf_arrays = sdf_arrays.drop('date_post_shift', 'timestamps_all_sorted_length')
-        print()
-        sdf_arrays.show(3)
-        print()
-        
+        # ?
         
         ######################
         #   Sliding window   #
@@ -450,15 +432,6 @@ def PrepareForexData():
             .withColumn('length_test_ts', f.array_size(f.col('sw_timestamps')))
         )
 
-        print()
-        sdf_arrays.show(3)
-        print()
-        if False:
-            print(sdf_arrays.count())
-            print(sdf_arrays.dropna().count())
-            print()
-            spark.stop(); import sys; sys.exit(0)
-
        
         ######################
         #   Explode arrays   #
@@ -466,16 +439,6 @@ def PrepareForexData():
 
         from utilities.spark_explode import spark_explode_it
         sdf_arrays = spark_explode_it(sdf_arrays)
-
-        print()
-        sdf_arrays.show(3)
-        print()
-        if False:
-            print()
-            print(sdf_arrays.count())
-            print(sdf_arrays.dropna().count())
-            print()
-            spark.stop(); import sys; sys.exit(0)
         
        
         ############
@@ -483,7 +446,6 @@ def PrepareForexData():
         ############
 
         sdf_arrays = sdf_arrays.coalesce(n_processors)
-
 
         
         #######################################################
@@ -495,10 +457,6 @@ def PrepareForexData():
         # ...so refactor this baby
         #
 
-
-
-        
-        
         items_list = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
         for item in items_list:
             sdf_arrays = sdf_arrays.withColumn('size_' + item, f.array_size(f.col(item)))
@@ -541,66 +499,6 @@ def PrepareForexData():
             .drop('size_return', 'size_volatility', 'size_volume', 'size_lhc_mean', 'size_sin', 'size_cos')
             .withColumn('timestamp_first', f.col('timestamps')[0])
         )
-
-
-
-
-
-        
-        #
-        # This prompts an error
-        #
-        # print()
-        # (
-        #     sdf_arrays
-        #     .groupBy('size_timestamps')
-        #     .agg(
-        #         f.count('size_timestamps').alias('count')
-        #     )
-        # ).show(10)
-        # print()
-
-
-
-        
-        # (
-        #     sdf_arrays.select('size_timestamps').distinct().show(10)
-        # )
-
-
-
-
-        
-        # #
-        # # Where are these NULLs coming from?
-        # #
-        # print()
-        # sdf_arrays.where(f.col('size_timestamps').isNull()).show(10)
-        # print()
-
-
-        
-
-
-
-
-        
-        # # this is not giving clear results
-        # (
-        #     sdf_arrays
-        #     .withColumn('not_null', sdf_arrays['timestamps'].isNotNull())
-        #     .groupBy('not_null')
-        #     .agg(f.count('timestamps').alias('count'))
-        #     .show(10)
-        # )
-        # print()
-
-        
-        # #
-        # # Save the version with NULLs for later investigation
-        # #
-        # full_exploded_with_NULLs_output_path = run_dir + '/spark_exploded_with_NULLs_' + run_id
-        # sdf_arrays.write.mode('overwrite').parquet(full_exploded_with_NULLs_output_path)
         
         #
         # Remove the NULLs for now (and investigate why there are NULLs in the near future...)
@@ -612,10 +510,6 @@ def PrepareForexData():
             .drop('not_null')
             .dropna()
         )
-        
-        #######
-
-
         
         
         ############
@@ -629,31 +523,7 @@ def PrepareForexData():
         #   Final clean up   #
         ######################
 
-        sdf_arrays = sdf_arrays.drop('timestamps', 'size_timestamps', 'date_post_shift').dropna()
-
-        print()
-        sdf_arrays.show(3)
-        print()
-        if False:
-            print()
-            print(sdf_arrays.count())
-            print(sdf_arrays.dropna().count())
-            print()
-            spark.stop(); import sys; sys.exit(0)
-
-            
-        # #####################
-        # #   Get Nth items   #
-        # #####################
-
-        # from utilities.spark_n_row import get_nth_rows
-        # spark.conf.set("spark.sql.shuffle.partitions", 10)  # temp
-        
-        # sdf_arrays = get_nth_rows(sdf_arrays)
-
-        # print()
-        # sdf_arrays.show(10)
-        # print()
+        sdf_arrays = sdf_arrays.drop('timestamps', 'size_timestamps', 'date_post_shift').dropna()          
         
         
         ####################
@@ -665,17 +535,6 @@ def PrepareForexData():
         
         full_exploded_output_path = run_dir + '/spark_exploded_' + run_id + '.parquet'
         sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
-
-
-        print()
-        sdf_arrays.show(3)
-        print()
-        if False:
-            print()
-            print(sdf_arrays.count())
-            print(sdf_arrays.dropna().count())
-            print()
-            spark.stop(); import sys; sys.exit(0)
 
         
         ##############
@@ -690,16 +549,87 @@ def PrepareForexData():
         
         return to_return
 
-    # ###############
-    # #   X and y   #
-    # ###############
+    ###############
+    #   X and y   #
+    ###############
     
-    # @task()
-    # def derive_X_and_y(
-    #         #spark_exploded_data_dict : dict,
-    # ):
-
+    @task()
+    def derive_X_and_y(
+            spark_exploded_data_dict : dict,
+    ):
+        import pyspark.sql.functions as f
+        from pyspark.sql.types import ArrayType, FloatType
         
+        full_exploded_output_path = spark_exploded_data_dict['full_exploded_output_path']
+
+        #
+        # get spark session
+        #
+        # this MAY only be necessary for debugging... not sure yet
+        from utilities.spark_session import get_spark_session
+        spark = get_spark_session()
+        spark.catalog.clearCache()  # will this help?
+        
+        #
+        # load data
+        #
+        sdf_arrays = (
+            spark.read.parquet(full_exploded_output_path)
+            .orderBy('timestamp_first')
+        )
+
+        #
+        # For debugging
+        #
+
+        if limit_5:
+            sdf_arrays = sdf_arrays.limit(5)
+
+        #
+        # split between X and y for each variable
+        #
+        from utilities.X_and_y import udf_get_X
+        item_list_X = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
+        for item in item_list_X:
+            sdf_arrays = (
+                sdf_arrays
+                .withColumn(item + '_X', udf_get_X(f.col(item)))
+            )
+
+        from utilities.X_and_y import udf_get_y
+        item_list_y = ['return', 'lhc_mean']
+        for item in item_list_y:
+            sdf_arrays = (
+                sdf_arrays
+                .withColumn(item + '_y', udf_get_y(f.col(item)))
+            )
+
+        sdf_arrays = sdf_arrays.drop(*item_list_X)
+
+        #
+        # compute X mean and std
+        #
+        from utilities.X_and_y import udf_mean_it, udf_std_it
+        for item in item_list_X:
+            sdf_arrays = (
+                sdf_arrays
+                .withColumn(item + '_X_mean', udf_mean_it(f.col(item + '_X')))
+                .withColumn(item + '_X_std', udf_std_it(f.col(item + '_X')))
+            )
+
+        #
+        # scale X
+        #
+        #for item in item_list_X:
+        #    sdf_arrays = (
+        #        sdf_arrays
+
+            
+            
+        print()
+        sdf_arrays.show(3)
+        print()
+                
     
     #
     # define pipeline component order and dependencies
@@ -719,9 +649,12 @@ def PrepareForexData():
         #
 
         # What arguments go here? A filepath?
-        nans_dict = deal_with_nans()  
+        #nans_dict = deal_with_nans()  
 
-        #X_y_dict = derive_X_and_y()        
+        # temp
+        nans_dict = {'full_exploded_output_path' : run_dir + '/spark_exploded_' + run_id + '.parquet'}
+        
+        X_y_dict = derive_X_and_y(nans_dict)
 
         
         #print()
