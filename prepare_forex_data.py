@@ -5,7 +5,7 @@ from airflow.decorators import dag, task
 
 # temp
 debug_mode = True
-limit_5 = True
+limit_5 = False
 run_id = '309457bc-a227-4332-8c0b-2cf5dd38749c'
 run_dir = '/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries'
 n_processors = 20
@@ -589,7 +589,7 @@ def PrepareForexData():
         # split between X and y for each variable
         #
         from utilities.X_and_y import udf_get_X
-        item_list_X = ['return', 'volatility', 'volume', 'lhc_mean', 'sin', 'cos']
+        item_list_X = ['return', 'volatility', 'volume', 'lhc_mean']
         for item in item_list_X:
             sdf_arrays = (
                 sdf_arrays
@@ -618,18 +618,83 @@ def PrepareForexData():
             )
 
         #
+        # save X mean and std
+        #
+        full_stat_path = spark_exploded_data_dict['full_exploded_output_path'].replace('spark_exploded', 'spark_scaling_stats')
+        columns_list = ['timestamp_first']
+        for item in item_list_X:
+            columns_list.append(item + '_X_mean')
+            columns_list.append(item + '_X_std')
+        (
+            sdf_arrays
+            .coalesce(n_processors)
+            .select(*columns_list)
+            .write.mode('overwrite').parquet(full_stat_path)
+        )
+
+        #
         # scale X
         #
-        #for item in item_list_X:
-        #    sdf_arrays = (
-        #        sdf_arrays
-
-            
+        from utilities.X_and_y import udf_scale_it
+        for item in item_list_X:
+            sdf_arrays = (
+                sdf_arrays
+                .withColumn(
+                    item + '_X_scaled',
+                    udf_scale_it(
+                        f.col(item + '_X'),
+                        f.col(item + '_X_mean'),
+                        f.col(item + '_X_std'),
+                    )
+                )
+                .drop(item + '_X')
+            )
             
         print()
         sdf_arrays.show(3)
         print()
-                
+
+        #
+        # scale y
+        #
+        for item in item_list_y:
+            sdf_arrays = (
+                sdf_arrays
+                .withColumn(
+                    item + '_y_scaled',
+                    udf_scale_it(
+                        f.col(item + '_y'),
+                        f.col(item + '_X_mean'),
+                        f.col(item + '_X_std'),
+                    )
+
+                )
+                .drop(item + '_y')
+            )
+
+        for item in item_list_X:
+            sdf_arrays = sdf_arrays.drop(item + '_X_mean', item + '_X_std')
+            
+        print()
+        sdf_arrays.show(3)
+        print()
+
+        #
+        # save
+        #
+        full_scaled_path = full_stat_path.replace('spark_scaling_stats', 'spark_scaled')
+        (
+            sdf_arrays
+            .coalesce(n_processors)
+            .write.mode('overwrite').parquet(full_scaled_path)
+        )
+
+        return {
+            'full_scaled_path' : full_scaled_path,
+            'full_scaling_stats_path' : full_stat_path,
+        }
+
+        
     
     #
     # define pipeline component order and dependencies
