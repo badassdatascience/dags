@@ -261,7 +261,8 @@ def PrepareForexData():
             table_prefix = 'pandas_preparation_completed',
             table_prefix_new = 'spark',
     ):
-
+        pass
+    
 
     ######################
     #   Deal with NaNs   #
@@ -411,6 +412,7 @@ def PrepareForexData():
 
         sdf_arrays = sdf_arrays.coalesce(n_processors)
         
+        
         ###############################################
         #   Find lists too short for sliding window   #
         ###############################################
@@ -425,18 +427,37 @@ def PrepareForexData():
         # print()
         # sdf_arrays.where(f.col('timestamps_all_sorted_length') <= 300).show()
         # print()
+
+        ####################
+        #   Some cleanup   #
+        ####################
+
+        #sdf_arrays = sdf_arrays.drop('date_post_shift', 'timestamps_all_sorted_length')
+        print()
+        sdf_arrays.show(3)
+        print()
         
         
         ######################
         #   Sliding window   #
         ######################
+
         
         from utilities.spark_sliding_window import do_sliding_window
         sdf_arrays = (
             do_sliding_window(sdf_arrays)
-            .dropna()
+            .withColumn('length_test', f.array_size(f.col('sw_return')))
+            .withColumn('length_test_ts', f.array_size(f.col('sw_timestamps')))
         )
-        sdf_arrays.show(2)
+
+        print()
+        sdf_arrays.show(3)
+        print()
+        if False:
+            print(sdf_arrays.count())
+            print(sdf_arrays.dropna().count())
+            print()
+            spark.stop(); import sys; sys.exit(0)
 
        
         ######################
@@ -445,7 +466,17 @@ def PrepareForexData():
 
         from utilities.spark_explode import spark_explode_it
         sdf_arrays = spark_explode_it(sdf_arrays)
-       
+
+        print()
+        sdf_arrays.show(3)
+        print()
+        if False:
+            print()
+            print(sdf_arrays.count())
+            print(sdf_arrays.dropna().count())
+            print()
+            spark.stop(); import sys; sys.exit(0)
+        
        
         ############
         #   Test   #
@@ -598,9 +629,19 @@ def PrepareForexData():
         #   Final clean up   #
         ######################
 
-        sdf_arrays = sdf_arrays.drop('timestamps', 'size_timestamps').dropna()
+        sdf_arrays = sdf_arrays.drop('timestamps', 'size_timestamps', 'date_post_shift').dropna()
 
+        print()
+        sdf_arrays.show(3)
+        print()
+        if False:
+            print()
+            print(sdf_arrays.count())
+            print(sdf_arrays.dropna().count())
+            print()
+            spark.stop(); import sys; sys.exit(0)
 
+            
         # #####################
         # #   Get Nth items   #
         # #####################
@@ -624,6 +665,17 @@ def PrepareForexData():
         
         full_exploded_output_path = run_dir + '/spark_exploded_' + run_id + '.parquet'
         sdf_arrays.write.mode('overwrite').parquet(full_exploded_output_path)
+
+
+        print()
+        sdf_arrays.show(3)
+        print()
+        if False:
+            print()
+            print(sdf_arrays.count())
+            print(sdf_arrays.dropna().count())
+            print()
+            spark.stop(); import sys; sys.exit(0)
 
         
         ##############

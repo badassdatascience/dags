@@ -4,7 +4,7 @@ def spark_explode_it(df):
 
     to_return = (
         df
-        .withColumn('zipped_array', f.arrays_zip('timestamps_all_sorted', 'sw_timestamps', 'sw_return', 'sw_volatility', 'sw_volume', 'sw_lhc_mean', 'sw_sin', 'sw_cos'))
+        .withColumn('zipped_array', f.arrays_zip('sw_timestamps', 'sw_return', 'sw_volatility', 'sw_volume', 'sw_lhc_mean', 'sw_sin', 'sw_cos'))  # timestamps_all_sorted
         .withColumn('zipped_array', f.explode('zipped_array'))
         .select(
             'date_post_shift',
