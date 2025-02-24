@@ -680,12 +680,13 @@ def PrepareForexData():
         print()
 
         #
-        # save
+        # save (before that dropna)
         #
         full_scaled_path = full_stat_path.replace('spark_scaling_stats', 'spark_scaled')
         (
             sdf_arrays
             .coalesce(n_processors)
+            .dropna()
             .write.mode('overwrite').parquet(full_scaled_path)
         )
 
