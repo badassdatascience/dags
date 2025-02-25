@@ -1,6 +1,6 @@
 import numpy as np
 import pyspark.sql.functions as f
-from pyspark.sql.types import ArrayType, FloatType
+from pyspark.sql.types import ArrayType, FloatType, BooleanType
 
 
 n_back = 180
@@ -30,4 +30,15 @@ def scale_it(the_array, the_mean, the_std):
 
 udf_scale_it = f.udf(scale_it, ArrayType(FloatType()))
 
+def is_there_a_nan_in_the_array(the_array):
+    the_array = np.array(the_array)
+    if np.max(np.int64(np.isnan(the_array))) > 0:
+        return True
+    else:
+        return False
+
+udf_is_there_a_nan_in_the_array = f.udf(
+    is_there_a_nan_in_the_array,
+    BooleanType()
+)
 
