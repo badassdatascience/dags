@@ -674,11 +674,39 @@ def PrepareForexData():
 
         for item in item_list_X:
             sdf_arrays = sdf_arrays.drop(item + '_X_mean', item + '_X_std')
-            
+
         print()
         sdf_arrays.show(3)
         print()
 
+        #
+        # check for NaNs
+        #
+        from utilities.X_and_y import udf_is_there_a_nan_in_the_array
+        sdf_arrays = (
+            sdf_arrays
+            .withColumn(
+                'has_nan',
+                (
+                    udf_is_there_a_nan_in_the_array(f.col('timestamp_first')) |
+                    udf_is_there_a_nan_in_the_array(f.col('return_X_scaled')) |
+                    udf_is_there_a_nan_in_the_array(f.col('volatility_X_scaled')) |
+                    udf_is_there_a_nan_in_the_array(f.col('volume_X_scaled')) |
+                    udf_is_there_a_nan_in_the_array(f.col('lhc_mean_X_scaled')) |
+                    udf_is_there_a_nan_in_the_array(f.col('sin')) |
+                    udf_is_there_a_nan_in_the_array(f.col('cos')) |
+                    udf_is_there_a_nan_in_the_array(f.col('return_y_scaled')) |
+                    udf_is_there_a_nan_in_the_array(f.col('lhc_mean_y_scaled'))
+                )
+            )
+            .where(f.col('has_nan') == False)
+            .drop('has_nan')
+        )
+
+        print()
+        sdf_arrays.show(5)
+        print()
+        
         #
         # save (before that dropna)
         #
@@ -719,15 +747,26 @@ def PrepareForexData():
 
         # temp
         nans_dict = {'full_exploded_output_path' : run_dir + '/spark_exploded_' + run_id + '.parquet'}
-        
-        X_y_dict = derive_X_and_y(nans_dict)
 
         
-        #print()
-        #import pprint as pp
-        #pp.pprint(X_y_dict)
-        #print()
+        #X_y_dict = derive_X_and_y(nans_dict)
+
+        # temp
+        X_y_dict = {
+            'full_scaled_path' : run_dir + '/spark_scaled_' + run_id + '.parquet',
+            'full_scaling_stats_path' : run_dir + '/spark_scaling_stats_' + run_id + '.parquet',
+            'debug_mode' : True,
+            'limit_5' : False,
+        }
+
+        from utilities.spark_build_matrices import build_matrices
+        build_matrices_dict = build_matrices(X_y_dict)
+
         
+        
+        #print()
+        #pdf = build_matrices_dict['pdf_Xy']
+        #print()
     
 
 

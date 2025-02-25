@@ -51,6 +51,8 @@ if True:
     df_scaled = pd.read_parquet(full_scaled_output_path)
     df_scaling_stats = pd.read_parquet(full_scaling_stats_path)
 
+    df_final = pd.read_parquet('/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_final_309457bc-a227-4332-8c0b-2cf5dd38749c.parquet')
+    
     print()
     print(df_exploded)
     print()
@@ -58,13 +60,31 @@ if True:
     print()
     print(df_scaled.columns)
     print()
-    print(df_scaling_stats)
+    print(df_final)
     print()
-    print(df_scaling_stats.columns)
-    print()
+
+
+
+    # print(df_scaling_stats)
+    # print()
+    # print(df_scaling_stats.columns)
+    # print()
     
     
 
 
+
+
+# print()
+
+# import numpy as np
+
+
+# def is_there_a_nan_in_the_array(the_array):
+#     the_array = np.array(the_array)
+#     if np.max(np.int64(np.isnan(array)))) > 0:
+#         return True
+#     else:
+#         return False
 
 
