@@ -22,7 +22,6 @@ def train_val_test_split(the_dict):
     # based on past investigation. Confirming this before spliting
     # and shuffling might be a good itea.
 
-    
     #
     # temp
     #
@@ -122,8 +121,6 @@ def train_val_test_split(the_dict):
         pp.pprint(result_dict)
         print()
 
-    verbose = True
-        
     #
     # QA (more testing the results dictionary)
     #
@@ -143,6 +140,15 @@ def train_val_test_split(the_dict):
         print('Passes?', passes_the_test)
         print()
         
-    
-    return {'booger', 'booger'}
+    #
+    # save and return
+    #
+    split_Xy_path = the_dict['back_to_pandas_save_path'].replace(
+        'full_NumPy_',
+        'full_train_val_test_'
+    )
+    with open(split_Xy_path, 'wb') as fff:
+        pickle.dump(result_dict, fff)
+
+    return {'data_path', split_Xy_path}
     
