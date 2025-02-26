@@ -764,7 +764,10 @@ def PrepareForexData():
 
         y_possibilities_return = pdf_y_possibilities_return.to_numpy()
         y_possibilities_lhc_mean = pdf_y_possibilities_lhc_mean.to_numpy()
-        
+
+        y_forward_return = np.array(pdf['return_y_scaled'].to_list())
+        y_forward_lhc_mean = np.array(pdf['lhc_mean_y_scaled'].to_list())
+
         #
         # move the independent variable to a NumPy matrix
         #
@@ -800,6 +803,8 @@ def PrepareForexData():
         print(np.sum(np.int32(np.isnan(X))))
         print(np.sum(np.int32(np.isnan(y_possibilities_return))))
         print(np.sum(np.int32(np.isnan(y_possibilities_lhc_mean))))
+        print(np.sum(np.int32(np.isnan(y_forward_return))))
+        print(np.sum(np.int32(np.isnan(y_forward_lhc_mean))))
         print()
 
         #
@@ -808,6 +813,8 @@ def PrepareForexData():
         print(X.shape)
         print(y_possibilities_return.shape)
         print(y_possibilities_lhc_mean.shape)
+        print(y_forward_return.shape)
+        print(y_forward_lhc_mean.shape)
         print()
 
         #
@@ -821,23 +828,36 @@ def PrepareForexData():
         print()
         print(y_possibilities_lhc_mean[0:2, :])
         print()
+        print(pdf[['timestamp_first', 'return_y_scaled', 'lhc_mean_y_scaled']])
+        print()
+        print(y_forward_return[0:2, :])
+        print()
+        print(y_forward_lhc_mean[0:2, :])
+        print()
         
         #
         # save temporary
         #
         save_path = path_dict['full_final_path'].replace('spark_final_', 'full_NumPy_').replace('.parquet', '.pickled')
-        # save_dict = {
-        #     'X' : X,
-        #     'y_return' : 
+        
+        save_dict = {
+            'X' : X,
+            'y_possibilities_return' : y_possibilities_return,
+            'y_possibilities_lhc_mean' : y_possibilities_lhc_mean,
+            'y_forward_return' : y_forward_return,
+            'y_forward_lhc_mean' : y_forward_lhc_mean,
+        }
 
+        with open(save_path, 'wb') as fff:
+            pickle.dump(save_dict, fff)
 
-        # with open(save_path, 'wb') as fff:
-
-
+        return_dict = {'back_to_pandas_save_path' : save_path}
+        
         #
         # get out of here
         #
-        return {'booger', 'booger'}
+        return return_dict
+    
         
 
 

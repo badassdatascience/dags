@@ -52,6 +52,15 @@ if True:
     df_scaling_stats = pd.read_parquet(full_scaling_stats_path)
 
     df_final = pd.read_parquet('/home/emily/Desktop/projects/test/badass-data-science/badassdatascience/forecasting/deep_learning/pipeline_components/output/queries/spark_final_309457bc-a227-4332-8c0b-2cf5dd38749c.parquet')
+
+    full_Xy_dict_path = run_dir + '/full_NumPy_' + run_id + '.pickled'
+    import pickle
+    with open(full_Xy_dict_path, 'rb') as fff:
+        dict_full_Xy = pickle.load(fff)
+
+        
+
+
     
     print()
     print(df_exploded)
@@ -61,6 +70,8 @@ if True:
     print(df_scaled.columns)
     print()
     print(df_final)
+    print()
+    print(dict_full_Xy.keys())
     print()
 
 
