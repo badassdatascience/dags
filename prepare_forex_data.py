@@ -764,12 +764,6 @@ def PrepareForexData():
 
         y_possibilities_return = pdf_y_possibilities_return.to_numpy()
         y_possibilities_lhc_mean = pdf_y_possibilities_lhc_mean.to_numpy()
-        print()
-        print(y_possibilities_lhc_mean)
-        print()
-        print(y_possibilities_lhc_mean.shape)
-        print()
-        import sys; sys.exit(0)
         
         #
         # move the independent variable to a NumPy matrix
@@ -804,8 +798,30 @@ def PrepareForexData():
         #
         print()
         print(np.sum(np.int32(np.isnan(X))))
+        print(np.sum(np.int32(np.isnan(y_possibilities_return))))
+        print(np.sum(np.int32(np.isnan(y_possibilities_lhc_mean))))
         print()
 
+        #
+        # test array sizes
+        #
+        print(X.shape)
+        print(y_possibilities_return.shape)
+        print(y_possibilities_lhc_mean.shape)
+        print()
+
+        #
+        # validate order
+        #
+        print(pdf[['timestamp_first', 'return_y_scaled_min', 'lhc_mean_y_scaled_min', 'X']].head(3))
+        print()
+        print(X[0:2, 0:10, 0])
+        print()
+        print(y_possibilities_return[0:2, :])
+        print()
+        print(y_possibilities_lhc_mean[0:2, :])
+        print()
+        
         #
         # save temporary
         #
