@@ -9,6 +9,8 @@ def shuffle_indices(indices_train, indices_val, indices_test):
 
 def test_shuffle(indices_train, indices_val, indices_test):
     print()
+    print('Shuffle test:')
+    print()
     print(min(indices_train), max(indices_train), indices_train[0:10])
     print(min(indices_val), max(indices_val), indices_val[0:10])
     print(min(indices_test), max(indices_test), indices_test[0:10])
@@ -71,6 +73,13 @@ def train_val_test_split(the_dict):
     indices_val = np.arange(cutoff_train, cutoff_val)
     indices_test = np.arange(cutoff_val, n_samples)
 
+    indices_dict = {
+        'train' : indices_train,
+        'val' : indices_val,
+        'test' : indices_test,
+    }
+
+    
     #
     # shuffle
     #
@@ -80,18 +89,8 @@ def train_val_test_split(the_dict):
             indices_val,
             indices_test
         )
-
-    if True:
-        test_shuffle(indices_train, indices_val, indices_test)
-
-
-
-        
-    indices_dict = {
-        'train' : indices_train,
-        'val' : indices_val,
-        'test' : indices_test,
-    }
+        if verbose:
+            test_shuffle(indices_train, indices_val, indices_test)
     
     #
     # QA #2
@@ -113,17 +112,37 @@ def train_val_test_split(the_dict):
         for column in columns_list:
             result_dict[key][column] = dict_full_Xy[column][indices_dict[key]]
 
+
     #
-    # QA #3
+    # QA (results dictionary)
     #
     if verbose:
         print()
+        import pprint as pp
+        pp.pprint(result_dict)
+        print()
+
+    verbose = True
+        
+    #
+    # QA (more testing the results dictionary)
+    #
+    if verbose:
+        print()
+        passes_the_test = True
         for key in result_dict.keys():
             print()
+            test_value_list = []
             for column in result_dict[key].keys():
                 print(key, column, result_dict[key][column].shape)
+                test_value_list.append(result_dict[key][column].shape[0])
+
+            if min(test_value_list) != max(test_value_list):
+                passes_the_test = False
         print()
-            
+        print('Passes?', passes_the_test)
+        print()
+        
     
     return {'booger', 'booger'}
     
