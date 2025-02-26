@@ -52,8 +52,8 @@ def build_matrices(last_task_dict):
                 'volatility_X_scaled',
                 'volume_X_scaled',
                 'lhc_mean_X_scaled',
-                'sin',
-                'cos',
+                'sin_X',
+                'cos_X',
             )
         )
         .drop(
@@ -61,8 +61,8 @@ def build_matrices(last_task_dict):
             'volatility_X_scaled',
             'volume_X_scaled',
             'lhc_mean_X_scaled',
-            'sin',
-            'cos',
+            'sin_X',
+            'cos_X',
         )
     )
 

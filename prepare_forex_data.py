@@ -595,6 +595,13 @@ def PrepareForexData():
                 sdf_arrays
                 .withColumn(item + '_X', udf_get_X(f.col(item)))
             )
+        for item in ['cos', 'sin']:
+            sdf_arrays = (
+                sdf_arrays
+                .withColumn(item + '_X', udf_get_X(f.col(item)))
+                .drop(item)
+            )
+            
 
         from utilities.X_and_y import udf_get_y
         item_list_y = ['return', 'lhc_mean']
@@ -693,8 +700,8 @@ def PrepareForexData():
                     udf_is_there_a_nan_in_the_array(f.col('volatility_X_scaled')) |
                     udf_is_there_a_nan_in_the_array(f.col('volume_X_scaled')) |
                     udf_is_there_a_nan_in_the_array(f.col('lhc_mean_X_scaled')) |
-                    udf_is_there_a_nan_in_the_array(f.col('sin')) |
-                    udf_is_there_a_nan_in_the_array(f.col('cos')) |
+                    udf_is_there_a_nan_in_the_array(f.col('sin_X')) |
+                    udf_is_there_a_nan_in_the_array(f.col('cos_X')) |
                     udf_is_there_a_nan_in_the_array(f.col('return_y_scaled')) |
                     udf_is_there_a_nan_in_the_array(f.col('lhc_mean_y_scaled'))
                 )
@@ -723,7 +730,108 @@ def PrepareForexData():
             'full_scaling_stats_path' : full_stat_path,
         }
 
+    ######################
+    #   Back to Pandas   #
+    ######################
+    
+    @task()
+    def back_to_pandas(path_dict):
+
+        # need to somehow sort by time
+
+        #
+        # useful libraries
+        #
+        import numpy as np
+        import pandas as pd
+        import pickle
+
+        #
+        # load dataframe into Pandas
+        #
+        pdf = pd.read_parquet(path_dict['full_final_path'])
+
+        #
+        # sort
+        #
+        pdf = pdf.sort_values(by = ['timestamp_first']).reset_index()
+
+        #
+        # zero in on the dependent variables we want
+        #
+        pdf_y_possibilities_return = pdf[['return_y_scaled_min', 'return_y_scaled_mean', 'return_y_scaled_median', 'return_y_scaled_max']]
+        pdf_y_possibilities_lhc_mean = pdf[['lhc_mean_y_scaled_min', 'lhc_mean_y_scaled_mean', 'lhc_mean_y_scaled_median', 'lhc_mean_y_scaled_max']]
+
+        y_possibilities_return = pdf_y_possibilities_return.to_numpy()
+        y_possibilities_lhc_mean = pdf_y_possibilities_lhc_mean.to_numpy()
+        print()
+        print(y_possibilities_lhc_mean)
+        print()
+        print(y_possibilities_lhc_mean.shape)
+        print()
+        import sys; sys.exit(0)
         
+        #
+        # move the independent variable to a NumPy matrix
+        #
+        p_series_X = pdf['X']
+        q = np.array(p_series_X.tolist())
+        
+        #
+        # temp
+        #
+        n_samples = q.shape[0]
+        n_features = 6
+        n_timestamps = 180
+
+        #
+        #
+        #
+        X = np.empty([n_samples, n_timestamps, n_features])
+        X[:] = np.nan
+
+        #
+        # There might be a way to do this operation without loops,
+        # which are typically slow in Python
+        #
+        for i in np.arange(0, n_samples):
+            for k in np.arange(0, n_features):
+                j_array = q[i, k]
+                X[i, :, k] = j_array
+        
+        #
+        # need to test for NaNs here (should be none)
+        #
+        print()
+        print(np.sum(np.int32(np.isnan(X))))
+        print()
+
+        #
+        # save temporary
+        #
+        save_path = path_dict['full_final_path'].replace('spark_final_', 'full_NumPy_').replace('.parquet', '.pickled')
+        # save_dict = {
+        #     'X' : X,
+        #     'y_return' : 
+
+
+        # with open(save_path, 'wb') as fff:
+
+
+        #
+        # get out of here
+        #
+        return {'booger', 'booger'}
+        
+
+
+
+
+
+
+
+
+    
     
     #
     # define pipeline component order and dependencies
@@ -749,7 +857,7 @@ def PrepareForexData():
         nans_dict = {'full_exploded_output_path' : run_dir + '/spark_exploded_' + run_id + '.parquet'}
 
         
-        #X_y_dict = derive_X_and_y(nans_dict)
+        # X_y_dict = derive_X_and_y(nans_dict)
 
         # temp
         X_y_dict = {
@@ -759,14 +867,17 @@ def PrepareForexData():
             'limit_5' : False,
         }
 
-        from utilities.spark_build_matrices import build_matrices
-        build_matrices_dict = build_matrices(X_y_dict)
+        #from utilities.spark_build_matrices import build_matrices
+        #build_matrices_dict = build_matrices(X_y_dict)
 
+        # temp
+        build_matrices_dict = {
+            'full_final_path' : run_dir + '/spark_final_' + run_id + '.parquet',
+        }
         
+        back_to_pandas_dict = back_to_pandas(build_matrices_dict)        
         
-        #print()
-        #pdf = build_matrices_dict['pdf_Xy']
-        #print()
+
     
 
 
