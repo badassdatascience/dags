@@ -858,14 +858,21 @@ def PrepareForexData():
         #
         return return_dict
     
-        
 
+    #############
+    #   Split   #
+    #############
+    
+    @task()
+    def train_val_test_split(the_dict):
 
+        from utilities.Xy_train_val_test_split import train_val_test_split
 
+        to_return_dict = train_val_test_split(the_dict)
 
+        return to_return_dict
 
-
-
+    
 
     
     
@@ -911,9 +918,11 @@ def PrepareForexData():
             'full_final_path' : run_dir + '/spark_final_' + run_id + '.parquet',
         }
         
-        back_to_pandas_dict = back_to_pandas(build_matrices_dict)        
-        
+        #back_to_pandas_dict = back_to_pandas(build_matrices_dict)
 
+        back_to_pandas_dict = {'back_to_pandas_save_path' : run_dir + '/full_NumPy_' + run_id + '.pickled'}
+        
+        split_dict = train_val_test_split(back_to_pandas_dict)
     
 
 
