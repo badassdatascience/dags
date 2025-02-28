@@ -12,7 +12,7 @@ class ReviewResults():
         self,
         training_run_id,
         training_data_source_id,
-        application_root_diretory,
+        application_root_directory,
         training_data_source_root_directory,
     ):
         self.application_root_directory = application_root_directory
@@ -20,12 +20,12 @@ class ReviewResults():
         self.training_data_source_root_directory = training_data_source_root_directory
         self.training_data_source_id = training_data_source_id
         
-        self.model_training_output_directory = application_root_directory + '/output/'
-        self.filename_config_json = model_training_output_directory + '/' + training_run_id + '_lstm_regressor_config.json'
-        self.filename_model_json = model_training_output_directory + '/' + training_run_id + '_model_regressor.json'
-        self.filename_model_final_weights = model_training_output_directory + '/' + training_run_id + '_final_weights_regressor.pickled'
-        self.filename_history = model_training_output_directory + '/' + training_run_id + '_final_history_regressor.pickled'
-        self.filename_train_val_test_data = training_data_source_root_directory + '/full_train_val_test_' + training_data_source_id + '.pickled'        
+        self.model_training_output_directory = self.application_root_directory + '/output/'
+        self.filename_config_json = self.model_training_output_directory + '/' + self.training_run_id + '_lstm_regressor_config.json'
+        self.filename_model_json = self.model_training_output_directory + '/' + self.training_run_id + '_model_regressor.json'
+        self.filename_model_final_weights = self.model_training_output_directory + '/' + self.training_run_id + '_final_weights_regressor.pickled'
+        self.filename_history = self.model_training_output_directory + '/' + self.training_run_id + '_final_history_regressor.pickled'
+        self.filename_train_val_test_data = self.training_data_source_root_directory + '/full_train_val_test_' + self.training_data_source_id + '.pickled'        
 
     def load_training_run_config(self):
         with open(self.filename_config_json) as fff:
