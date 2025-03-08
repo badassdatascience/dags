@@ -8,8 +8,8 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 
 # local libraries
-from forex.prepare_forex_data.config import config
-from forex.prepare_forex_data.pull_forex_data import pull_forex_data
+from forex.pre_training_data_prep.config import config
+from forex.pre_training_data_prep.pull_forex_data import pull_forex_data
 
 #
 # Define our DAG
