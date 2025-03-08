@@ -4,7 +4,7 @@ def pull_forex_data(
         price_type_name = 'mid',
         instrument_name = 'EUR/USD',
         interval_name = 'Minute',
-        output_directory = None,
+        output_file_name_and_path = None,
 ):
     mysql_hook = MySqlHook(mysql_conn_id = 'django')
 
@@ -18,5 +18,4 @@ def pull_forex_data(
         )
     )
 
-    filename = output_directory + '/' + 'NEW_raw_pdf.parquet'
-    pdf.to_parquet(filename)
+    pdf.to_parquet(output_file_name_and_path)
