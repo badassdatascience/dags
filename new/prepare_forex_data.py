@@ -12,9 +12,10 @@ from forex.pre_training_data_prep.config import config
 
 
 
-#
-# Define our DAG
-#
+###########
+#   DAG   #
+###########
+
 with DAG(
         dag_id = config['dag_id'],   # this may not work in the UI
         start_date = datetime(2024, 1, 1),    # change this at some point
@@ -22,9 +23,10 @@ with DAG(
         catchup = False,
 ) as dag:
 
-    #
-    # Pull candlestick data from the database
-    #
+    ###############################################
+    #   Pull candlestick data from the database   #
+    ###############################################
+    
     from forex.pre_training_data_prep.pull_forex_data import pull_forex_data
 
     task_pull_forex_data = PythonOperator(
@@ -37,9 +39,10 @@ with DAG(
         ),
     )
 
-    #
-    # Add timezone information
-    #
+    ################################
+    #   Add timezone information   #
+    ################################
+        
     from forex.pre_training_data_prep.add_timezone_information import add_timezone_information
 
     task_add_timezone_information = PythonOperator(
@@ -51,10 +54,18 @@ with DAG(
             minutes = config['retry_delay_minutes_pull_forex_data'],
         ),
     )
+
+    ###############################
+    #   Assemble DAG from tasks   #
+    ###############################
     
-    [ task_pull_forex_data ] >> task_add_timezone_information
+    #[ task_pull_forex_data ] >> task_add_timezone_information
+    task_add_timezone_information
 
-
+    
+#####################################
+#   Enable command-line execution   #
+#####################################
 
 if __name__ == '__main__':
     dag.test()
