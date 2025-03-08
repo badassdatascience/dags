@@ -21,7 +21,9 @@ with DAG(
         catchup = False,
 ) as dag:
 
+    #
     # Define the task that pulls candlestick data from the database
+    #
     task_pull_forex_data = PythonOperator(
         task_id = 'task_pull_forex_data',
         python_callable = pull_forex_data,
