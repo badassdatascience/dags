@@ -8,15 +8,15 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 
 # local libraries
-from utilities.config import config
-from utilities.pull_forex_data import pull_forex_data
+from forex.prepare_forex_data.config import config
+from forex.prepare_forex_data.pull_forex_data import pull_forex_data
 
 #
 # Define our DAG
 #
 with DAG(
-        dag_id = 'NEW_prepare_forex_data',    # change this at some point
-        start_date = datetime(2024, 1, 1),
+        dag_id = config['dag_id'],   # this may not work in the UI
+        start_date = datetime(2024, 1, 1),    # change this at some point
         schedule_interval = None,
         catchup = False,
 ) as dag:
@@ -25,12 +25,7 @@ with DAG(
     task_pull_forex_data = PythonOperator(
         task_id = 'task_pull_forex_data',
         python_callable = pull_forex_data,
-        op_kwargs = {
-            'price_type_name' : config['price_type_name'],
-            'instrument_name' : config['instrument_name'],
-            'interval_name' : config['interval_name'],
-            'output_file_name_and_path' : config['directory_output'] + '/' + config['filename_candlesticks_query_results'],
-        },
+        op_kwargs = config,
         retries = config['retries_pull_forex_data'],
         retry_delay = timedelta(
             minutes = config['retry_delay_minutes_pull_forex_data'],
