@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 
 # local libraries
 from forex.pre_training_data_prep.config import config
-from forex.pre_training_data_prep.pull_forex_data import pull_forex_data
+
+
 
 #
 # Define our DAG
@@ -22,8 +23,10 @@ with DAG(
 ) as dag:
 
     #
-    # Define the task that pulls candlestick data from the database
+    # Pull candlestick data from the database
     #
+    from forex.pre_training_data_prep.pull_forex_data import pull_forex_data
+
     task_pull_forex_data = PythonOperator(
         task_id = 'task_pull_forex_data',
         python_callable = pull_forex_data,
@@ -34,7 +37,22 @@ with DAG(
         ),
     )
 
-    task_pull_forex_data
+    #
+    # Add timezone information
+    #
+    from forex.pre_training_data_prep.add_timezone_information import add_timezone_information
+
+    task_add_timezone_information = PythonOperator(
+        task_id = 'task_add_timezone_information',
+        python_callable = add_timezone_information,
+        op_kwargs = config,
+        retries = config['retries_pull_forex_data'],
+        retry_delay = timedelta(
+            minutes = config['retry_delay_minutes_pull_forex_data'],
+        ),
+    )
+    
+    [ task_pull_forex_data ] >> task_add_timezone_information
 
 
 
